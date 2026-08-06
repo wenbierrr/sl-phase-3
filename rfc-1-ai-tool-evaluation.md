@@ -7,10 +7,10 @@
 2. [Scope](#scope)
 3. [Brief overview of the different tools](#brief-overview-of-the-different-tools)
 4. [Options considered](#options-considered)
-   - [K8sGPT — scanner + LLM explain](#k8sgpt--scanner--llm-explain)
-   - [kubectl-ai — conversational agent](#kubectl-ai--conversational-agent)
-   - [kagent — agentic platform](#kagent--agentic-platform)
-   - [LibreChat (MCP client) + MCP server](#librechat-mcp-client--mcp-server)
+   - [Option 1 — K8sGPT: scanner + optional LLM explain](#option-1--k8sgpt-scanner--llm-explain)
+   - [Option 2 — kubectl-ai: conversational agent](#option-2--kubectl-ai-conversational-agent)
+   - [Option 3 — kagent: agentic platform](#option-3--kagent-agentic-platform)
+   - [Option 4 — LibreChat (MCP client) + MCP server](#option-4--librechat-mcp-client--mcp-server)
 5. [Comparison matrix](#comparison-matrix)
 6. [Appendix](#appendix)
    - [Kagent design](#kagent-design)
@@ -22,11 +22,11 @@ The focus is to help DEs with their day to day deployment. Specifically, when a 
 
 What evidence is obtainable is constrained by what exists. There is no historical data on how long D-2-D troubleshooting takes today, no archive of past incidents to replay, and no environment beyond stg to test in. That rules out the comparisons a decision like this would normally rest on — before-and-after timings against a known baseline, or a holdout group.
 
-What remains is: **evaluate** the tools available, **get hands on** with the promising one against known failures on stg, then **measure** its value in DEs' hands. This is the path available here rather than a standard methodology, and it carries real limits — [RFC-2](rfc-2-mcp-server-evaluation.md).
+What remains is: **evaluate** the tools available, **get hands on** with the promising one against known failures on stg, then **measure** its value in DEs' hands. This is the path available here rather than a standard methodology, and it carries real limits — [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
 
 Running against known stg failures gives a **baseline feel for how the tool behaves and how to best configure it**: setup for the pilot.
 
-**This RFC covers the first step only** ([options](#options-considered) → [comparison matrix](#comparison-matrix)) — narrowing the field to one promising architecture. Getting hands on with it and measuring it follow in [RFC-2](rfc-2-mcp-server-evaluation.md).
+**This RFC covers the first step only** ([options](#options-considered) → [comparison matrix](#comparison-matrix)) — narrowing the field to one promising architecture. Getting hands on with it and measuring it follow in [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
 
 ## Scope
 
@@ -36,8 +36,8 @@ Running against known stg failures gives a **baseline feel for how the tool beha
 **Out of scope:**
 - Hosting of the LLM (an inference endpoint is assumed to be provided)
 - Which LLM model to use
-- **Which MCP server to pair with LibreChat** — k8sgpt serves as the reference implementation for scoring here; the actual choice (k8sgpt MCP, a kubernetes MCP, both, or an added Argo MCP) is [RFC-2](rfc-2-mcp-server-evaluation.md)
-- Hands-on work with the promising tool(s) on stg (behaviour and configuration) and measuring it with DEs — also [RFC-2](rfc-2-mcp-server-evaluation.md)
+- **Which MCP server to pair with LibreChat** — k8sgpt serves as the reference implementation for scoring here; the actual choice (k8sgpt MCP, a kubernetes MCP, both, or an added Argo MCP) is [RFC-2](rfc-2-mcp-server-eval-for-librechat.md)
+- Hands-on work with the promising tool(s) on stg (behaviour and configuration) and measuring it with DEs — also [RFC-2](rfc-2-mcp-server-eval-for-librechat.md)
 - Detailed security considerations of the chosen tool (agent definitions, rollout plan, RBAC wiring) — that follows in a separate design RFC once a tool is picked.
 
 ## Brief overview of the different tools
@@ -53,7 +53,7 @@ Running against known stg failures gives a **baseline feel for how the tool beha
 ## Options considered
 
 
-### K8sGPT — scanner + LLM explain
+### Option 1 — K8sGPT: scanner + LLM explain
 
 **What it is:** [K8sGPT](https://github.com/k8sgpt-ai/k8sgpt) is a scanner, not an assistant. Its fixed analyzers scan cluster resources read-only via `k8sgpt analyze` — this is deterministic and needs no LLM at all. The LLM only gets involved if the **optional** `--explain` flag is added, which sends each finding off to an LLM endpoint for a plain-English explanation on top of the raw finding.
 
@@ -87,7 +87,7 @@ sequenceDiagram
 
 Whatever the flavour, the output is the same — it reports *independent symptoms, no diagnoses, no correlation*. Therefore, to realise k8sgpt's full potential, a **correlation layer — an LLM that reasons over the raw findings** — is needed on top to tie the scattered symptoms back to the root cause.
 
-### kubectl-ai — conversational agent
+### Option 2 — kubectl-ai: conversational agent
 
 **What it is:** [kubectl-ai](https://github.com/GoogleCloudPlatform/kubectl-ai) converts natural language into `kubectl` commands in an interactive terminal session — a chat-like front end over the cluster, but CLI-only.
 
@@ -119,11 +119,11 @@ kubectl-ai --llm-provider=openai --model=openrouter/auto
 
 *kubectl-ai traces an `ImagePullBackOff` back to a bad image tag, proposes a fix command, asks for approval, then executes if given permission.*
 
-### kagent — agentic platform
+### Option 3 — kagent: agentic platform
 
 **What it is:** [kagent](https://github.com/kagent-dev/kagent) is a full agentic workflow platform — the only one of the four that autonomously drives multi-step investigation rather than a single request/response. A **Diagnostician** agent reasons over evidence gathered by a read-only **Collector** agent, in a loop, and returns a root cause + evidence + suggested fix. Both are custom agents — an `Agent` resource defined in kagent, not a plugin or a feature toggle. More details regarding the kagent architecture can be found [here](#kagent-design).
 
-### LibreChat (MCP client) + MCP server
+### Option 4 — LibreChat (MCP client) + MCP server
 
 **What it is:** [LibreChat](https://github.com/danny-avila/LibreChat) is an open-source, self-hostable multi-LLM chat web UI. Recent versions added MCP client support, so it can connect to an MCP server and call its tools mid-conversation — playing a similar front-end role to kubectl-ai, but as a general-purpose chat UI with a proper GUI rather than a purpose-built CLI client.
 
@@ -154,10 +154,10 @@ Each decision driver, scored across all four options, split into **Information**
 
 **Reading the last column.** LibreChat is only a chat interface — on its own it cannot see the cluster at all, so scoring it meant pairing it with an MCP server. We used k8sgpt.
 
-Cells marked *(k8sgpt as reference.)* are the ones that would change if a different MCP server were used. The unmarked cells describe LibreChat itself and stay true whichever MCP server sits behind it. Which server it should actually be is [RFC-2](rfc-2-mcp-server-evaluation.md).
+Cells marked *(k8sgpt as reference.)* are the ones that would change if a different MCP server were used. The unmarked cells describe LibreChat itself and stay true whichever MCP server sits behind it. Which server it should actually be is [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
 
 
-| Decision driver | | K8sGPT | kubectl-ai | kagent (assuming the Diagnostician & Collector architecture) | LibreChat + MCP server |
+| Decision driver | | 1 · K8sGPT | 2 · kubectl-ai | 3 · kagent (assuming the Diagnostician & Collector architecture) | 4 · LibreChat + MCP server |
 |---|---|---|---|---|---|
 | **Additional chores for the tool to be used** | Information | Maintanence of Dockerfile — patch to clear its High CVEs | Maintanence of Helm chart (none official) + Dockerfile — patch to clear its Critical CVE | Lots of bugs - difficult to make it work | *(k8sgpt ref.)* Maintanence of K8sGPT's Dockerfile — LibreChat only require values change in the helm chart |
 | | Evaluation metric | Low — one artifact | Med — two artifacts, both built from scratch | High | Low — one artifact |
@@ -180,21 +180,16 @@ Cells marked *(k8sgpt as reference.)* are the ones that would change if a differ
 
 With all the options weighed, the matrix leaves one candidate standing:
 
-- **K8sGPT alone** — no conversational follow-up
-- **kubectl-ai** — no GUI
-- **kagent** — adopting it means standing up an entire agentic platform inside the cluster: its own CRDs, controller, UI and Postgres, all to install, run and keep upgrading. That is a permanent day-1 and day-2 cost, and the autonomy it buys does not justify it
-- **LibreChat + MCP server** — no disqualifying factor
+1. **K8sGPT alone** — no conversational follow-up
+2. **kubectl-ai** — no GUI
+3. **kagent** — adopting it means standing up an entire agentic platform inside the cluster: its own CRDs, controller, UI and Postgres, all to install, run and keep upgrading. That is a permanent day-1 and day-2 cost, and the autonomy it buys does not justify it
+4. **LibreChat + MCP server** — no disqualifying factor
 
 ### What this verdict does and does not settle
 
 It settles the **orchestrator**: LibreChat, for its web GUI, persisted multi-user history, and the absence of any disqualifying gap.
 
-It does **not** settle the **MCP server**.
-
-Two questions therefore remain open, and both belong to [RFC-2](rfc-2-mcp-server-evaluation.md):
-
-1. **Which MCP server** backs LibreChat 
-2. **How the winning combination actually behaves, and how it should be configured**
+It does **not** settle the **MCP server**. That leaves one open question, and it belongs to [RFC-2](rfc-2-mcp-server-eval-for-librechat.md): **which combination of MCP servers to adopt, to best help DEs.**
 
 
 # Appendix

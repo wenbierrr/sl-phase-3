@@ -1,69 +1,40 @@
 # 8-week plan
 
-Everything here serves one question — **is this worth adopting?** — answered for the supervisor at week 8.
+**Week 1 = 10 Aug 2026 · Week 8 = 28 Sept 2026**
 
-## The three deliverables, in priority order
+The question these 8 weeks answer: **LibreChat + which combination of MCP servers brings DEs the most value?**
+
+Weeks 1–5 find the answer. Weeks 6–8 write it up. The RFC is written *from* findings, not alongside them — a document written backwards from evidence beats one written forwards from hopes.
+
+## Deliverables
 
 | | Acceptance criterion | What it actually is | Status |
 |---|---|---|---|
-| 1 | Written inventory of DE chores with time estimates and agent-suitability assessment, presented to the team | The profiling work that drove the focus decision | ✅ Done |
-| 2 | **Enablement material delivered in markdown and presented** | **The RFCs, PoC write-ups and research** — the body of written work | 🔨 Continuous |
-| 3 | Working PoC covering at least one focus area | LibreChat + MCP server on stg, if a promising tool holds up | 🔨 Weeks 1–7 |
-
-Deliverable 2 outranks deliverable 3, and deliverable 3 is conditional on a tool proving promising. **If the PoC stalls, the written work still lands and criterion 2 is still met.** The RFCs are the deliverable; the PoC is evidence for them.
-
-```mermaid
-gantt
-    title Next 8 weeks
-    dateFormat YYYY-MM-DD
-    axisFormat W%W
-
-    section 2 — Enablement material (markdown)
-    RFCs, PoC write-ups, research      :active, d2, 2026-08-10, 40d
-    Present to the team                :milestone, m3, 2026-10-02, 0d
-
-    section 3 — PoC on stg
-    Stand up LibreChat + candidates    :a1, 2026-08-10, 5d
-    Hands-on runs, tune config         :a2, 2026-08-17, 10d
-    Pick the MCP server                :milestone, m1, 2026-09-04, 0d
-    Fault catalogue + agree pass bars  :b1, 2026-09-07, 5d
-    Pilot week — DEs debug             :crit, b2, 2026-09-14, 5d
-
-    section Decision
-    Score against pass bars            :c1, 2026-09-21, 5d
-    Write up + go / no-go              :c2, 2026-09-28, 5d
-```
+| 1 | Written inventory of DE chores, with time estimates and agent-suitability assessment | The profiling that drove the focus decision | ✅ Done |
+| 2 | Enablement material delivered in markdown and presented | The RFCs, PoC write-ups and research | 🔄 Continuous |
+| 3 | Working PoC covering at least one focus area | LibreChat + the chosen MCP server(s) running on stg, in DEs' hands against fabricated and real failures | 🔄 Continuous |
 
 ## Week by week
 
-| Week | What happens | Output |
+| Weeks | Focus | What I'm doing |
 |---|---|---|
-| 1 | Deploy LibreChat + candidate MCP servers on stg; pin which Kubernetes MCP server | Something running to test against |
-| 2–3 | Run the same known failures through each combination; fill the comparison matrix | A **tuned configuration** and the matrix's blank cells filled |
-| 4 | Decide the MCP server; finish RFC-2's evaluation half | RFC-2 evaluation complete |
-| 5 | Build the fault catalogue; agree pass bars with the team **before** any pilot data exists | Sealed catalogue + agreed Day-0 thresholds |
-| 6 | Pilot week — injected faults, DEs debug through the tool, one scorecard per issue | Scorecards |
-| 7 | Score the pilot against the Day-0 thresholds | Pass or fail, with the numbers |
-| 8 | Write up the recommendation and present the body of work | **Go / no-go to the supervisor** |
+| **1–3**<br/>10–28 Aug | **Experiment** | • Try the different LibreChat + MCP server combinations across all three problem areas — troubleshooting, deploying, and the CPU/memory threshold work<br/>• Order: **kubectl first**, then judge whether k8sgpt earns its place on top, then Argo (read-only), then GitLab, then metrics<br/>• Agree the **scorecard and pass bars** with the team<br/>• Design **fabricated networking failures** — if nothing breaks on its own during the rollout, DEs have no reason to reach for the tool, so faults are injected to force the data points |
+| **4–5**<br/>31 Aug – 11 Sep | **Roll out to DEs** | • DEs use the tool against the fabricated failures and whatever real ones arrive<br/>• One scorecard per issue<br/>• Target the less-experienced DEs — that's the group the value claim rests on |
+| **6–8**<br/>14 Sep – 2 Oct | **Findings + write-up** | • Read the scorecards, derive the findings<br/>• Work out which combination actually brought the most value, and where it brought none<br/>• **Write the RFC** |
 
-RFC writing runs across every one of these weeks — that is deliverable 2, not a task at the end.
+## What the three problem areas are
 
-## The one gate that matters
+Each combination gets tested against all three — that is how we find out which one is worth having.
 
-Pass bars are agreed in **week 5**, before any pilot data exists. That is what stops them being quietly relaxed in week 7 to fit whatever came back.
+| | Problem |
+|---|---|
+| **Troubleshoot** | Argo sync failures, pods down / apps broken, Istio config (1.1.1–1.1.3) |
+| **Deploy** | AI creates a branch, edits the scaffolding and values files, raises an MR. A human approves and syncs — **AI never syncs** (1.1.4) |
+| **Threshold + remediate** | On OpenShift CPU/memory dashboards: determine what X is, then if X is exceeded, how to stop the bleeding and what the remediation steps are (2.2) |
 
-- **Pass** → RFC-3: production security, RBAC, rollout.
-- **Fail** → name the elimination factor. A well-evidenced *no* answers the epic's question as well as a yes, and deliverable 2 lands either way.
+## Also on the board
 
-Details in [rfc-2-mcp-server-evaluation.md](rfc-2-mcp-server-evaluation.md).
-
-## Not in these 8 weeks
-
-- **Gen AI for Platform Engineers 101** — the team enablement session (epic task 3). Parked, not dropped.
-- **RFC-4** deploying via Argo by MR, **RFC-5** the 90-day traffic baseline, **RFC-6** CPU/memory spike remediation. Mapped and waiting — see [CLAUDE.md](CLAUDE.md).
-
-## What could slip
-
-- **DE availability in week 6.** The pilot needs duty engineers actually running cases. If their week is busy, it slides and everything after it moves.
-- **The fault catalogue is on the critical path.** Sealed in week 5 or week 6 has nothing to run.
-- **Weeks 2–3 are the flexible part.** If tuning takes longer, take it from there rather than compressing the pilot or the write-up.
+| | | |
+|---|---|---|
+| **RFC-X** · production security | **May never be written** | Security, RBAC and rollout — only if a tool passes the Day-0 thresholds |
+| Grafana Kafka-throughput baseline (2.1) | **KIV** | Deliberately parked — not scoped, not written up |
