@@ -7,32 +7,23 @@
 
 1. [Motivation](#motivation)
 2. [Scope](#scope)
-3. [Brief overview of the MCP servers](#brief-overview-of-the-mcp-servers)
-4. [Options considered](#options-considered)
+3. [What counts as a win](#what-counts-as-a-win)
+4. [Brief overview of the MCP servers](#brief-overview-of-the-mcp-servers)
+5. [Options considered](#options-considered)
    - [Kubernetes MCP server](#kubernetes-mcp-server)
    - [k8sgpt MCP server](#k8sgpt-mcp-server)
    - [Argo MCP server](#argo-mcp-server)
    - [GitLab MCP server — the deploy path](#gitlab-mcp-server--the-deploy-path)
    - [Prometheus-compatible MCP server](#prometheus-compatible-mcp-server)
-5. [Comparison matrix](#comparison-matrix)
-6. [How this gets decided](#how-this-gets-decided)
+6. [Comparison matrix](#comparison-matrix)
+7. [How this gets decided](#how-this-gets-decided)
 
 
 ## Motivation
 
-[RFC-1](rfc-1-ai-tool-evaluation.md) narrowed four tools to one architecture — **LibreChat as the orchestrator** — and deliberately left open what sits behind it.
+[RFC-1](rfc-1-ai-tool-evaluation.md) settled the orchestrator — **LibreChat** — and deliberately left open what sits behind it. That gap decides everything: LibreChat supplies the interface and the persistence, but **the MCP server behind it decides what the LLM can actually see and do.**
 
-That gap is the whole question here. LibreChat supplies the interface, the conversation and the persistence; **the MCP server behind it decides what the LLM can actually see and do.** The DE-facing experience is identical either way; the ceiling is not.
-
-**This RFC answers one question: LibreChat + which combination of MCP servers brings DEs the most value?**
-
-Value is judged against three outcomes the decision-makers care about:
-
-1. **Prompt, then prepare the deployment** — from a chat request to a raised MR.
-2. **Show the blind spots of the OpenShift CPU/memory dashboards** — determine what X is, and once X is exceeded, give the steps that stop the bleeding and stop it recurring.
-3. **A less-experienced DE says it was useful** — not a senior DE, not the author.
-
-These are the yardstick, not a checklist. If a combination does not naturally address one, that is the finding — record it. A contorted claim that a combination "sort of" meets a point is worth less than a clean no.
+**The question this RFC answers: LibreChat + which combination of MCP servers brings DEs the most value?** Each candidate combination is tested against the three DE problem areas and judged on [what counts as a win](#what-counts-as-a-win). Production security follows in RFC-X, and only if this one passes.
 
 ## Scope
 
@@ -46,6 +37,16 @@ These are the yardstick, not a checklist. If a combination does not naturally ad
 - **Direct cluster writes by the agent, and AI-triggered Argo syncs.** Not a trade-off being weighed — a standing rule
 - Hosting of the LLM (an inference endpoint is assumed) and which model to use
 - Production security design (agent definitions, RBAC wiring, rollout plan) — RFC-X, and only if the pilot passes
+
+## What counts as a win
+
+Three outcomes the decision-makers care about. These are the yardstick a combination is judged against:
+
+1. **Prompt, then prepare the deployment** — from a chat request to a raised MR.
+2. **Show the blind spots of the OpenShift CPU/memory dashboards** — determine what X is, and once X is exceeded, give the steps that stop the bleeding and stop it recurring.
+3. **A less-experienced DE says it was useful** — not a senior DE, not the author.
+
+**A yardstick, not a checklist.** If a combination does not naturally address one of these, that is the finding — record it. A contorted claim that a combination "sort of" meets a point is worth less to a decision-maker than a clean no.
 
 ## Brief overview of the MCP servers
 

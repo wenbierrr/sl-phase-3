@@ -18,15 +18,9 @@
 
 ## Motivation
 
-The focus is to help DEs with their day to day deployment. Specifically, when a deployment breaks in the cluster, finding the cause and fix can be time-consuming. The goal is to assist the DE with troubleshooting deployment issues, so as to save time.
+When a deployment breaks in the cluster, finding the cause and the fix is time-consuming. The goal is to enable AI to assist DEs with troubleshooting these issues, so as to save time.
 
-What evidence is obtainable is constrained by what exists. There is no historical data on how long D-2-D troubleshooting takes today, no archive of past incidents to replay, and no environment beyond stg to test in. That rules out the comparisons a decision like this would normally rest on — before-and-after timings against a known baseline, or a holdout group.
-
-What remains is: **evaluate** the tools available, **get hands on** with the promising one against known failures on stg, then **measure** its value in DEs' hands. This is the path available here rather than a standard methodology, and it carries real limits — [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
-
-Running against known stg failures gives a **baseline feel for how the tool behaves and how to best configure it**: setup for the pilot.
-
-**This RFC covers the first step only** ([options](#options-considered) → [comparison matrix](#comparison-matrix)) — narrowing the field to one promising architecture. Getting hands on with it and measuring it follow in [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
+**The question this RFC answers: which AI tool is the most promising to take forward?** It narrows the field to one architecture ([options](#options-considered) → [comparison matrix](#comparison-matrix)). Getting hands on with it and measuring its value with DEs follow in [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
 
 ## Scope
 
