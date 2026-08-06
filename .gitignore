@@ -1,0 +1,4 @@
+# Nested git repos — kept here for context, tracked by their own .git
+# Never let `git add .` turn these into gitlinks
+LibreChat/
+kubernetes-mcp-server/

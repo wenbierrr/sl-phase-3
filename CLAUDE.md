@@ -4,11 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**This is a documents repo, not a code repo.** It holds `epic.md`, the RFC series, and `README.md` — no source code, dependency manifest, build system, or test suite, and therefore no build/lint/test commands to document. Only `README.md` is tracked in git; everything else is currently untracked, with no `.gitignore`.
+**Mostly documents, plus two vendored upstream repos.** The tracked content is `epic.md`, `plan.md`, the RFC series and `README.md` — no build system or test suite of our own, so no build/lint/test commands to document.
 
-The PoC work itself (LibreChat and MCP server deployments) lives on the staging cluster as Helm releases, not in this repo. If artifacts do land here — a values file, a patched Dockerfile, an agent prompt — add the commands to this section then.
+Alongside them sit two upstream projects, cloned in place, each tracked by its own `.git` and excluded via `.gitignore` so `git add .` cannot turn them into gitlinks:
 
-Do not infer a stack, framework, or directory layout from this file. Nothing has been chosen.
+| Directory | Upstream at | Local changes |
+|---|---|---|
+| `LibreChat/` | `chart-2.0.7-66-g8fcb77fe6` | `helm/librechat/values-sf.yaml`, plus chart edits for an optional `/app/uploads` volume |
+| `kubernetes-mcp-server/` | `v0.0.63-31-g9c6ef49` | `charts/kubernetes-mcp-server/values-sf.yaml`, `Dockerfile` patched for a containerd CVE |
+
+**The `-sf.yaml` files and the k8sgpt `serverInstructions` prompt inside them are the PoC's tuned configuration** — the thing weeks 1–3 exist to produce. They currently live only as uncommitted edits inside ignored directories, so a re-clone loses them. Treat them as deliverables, not scratch.
+
+Deployment is by `helm install`/`upgrade` with `-f <chart>/values-sf.yaml`; the subchart `.tgz` files under `LibreChat/helm/librechat/charts/` are vendored deliberately — do not run `helm dependency update`.
+
+Do not infer a stack or framework beyond this. Nothing else has been chosen.
 
 ## What this project is
 
@@ -16,7 +25,7 @@ R&D. The goal is to answer a question, not to ship a system: **can AI measurably
 
 Everything here is research, PoCs, and pilot tests in service of that decision. Nothing is intended for production.
 
-This has a direct consequence for how work should be done: **optimise for learning per unit of effort, and for evidence that would change the decision.** Prefer the throwaway spike that answers the question this week over the durable implementation that answers it next month. Hardcoding, manual steps, narrow happy paths, and scripts that only work on one cluster are all acceptable when they buy a faster answer — say so in the write-up rather than engineering them away.
+This has a direct consequence for how work should be done: **optimise for learning per unit of effort, and for evidence that would change the decision.**
 
 **Quantify what is useful; for everything rejected, name the elimination factor.** A rejection with a specific named reason carries the same decision weight as the winner — it tells the supervisor what was ruled out and why, so the same ground isn't re-covered later. RFC-1's verdict list is the template:
 
@@ -42,16 +51,74 @@ These are the yardstick a combination is justified against. They shape what gets
 
 **AI never triggers an Argo sync.** This is settled, not a trade-off to re-weigh.
 
+**The repo topology.** The org is on GitLab, organised as one **Group** holding multiple **Projects**, each with its own repository. Two of them carry the deploy flow. **GitLab is not installed yet.** These two GitHub repos are the authoritative scaffolding template — [helm-charts](https://github.com/wenbierrr/helm-charts), [argohub](https://github.com/wenbierrr/argohub) — to be recreated as Projects inside the Group once GitLab is up on OpenShift. Treat their layout as the spec, not as a repo to migrate.
+
+| Project | Path | Holds |
+|---|---|---|
+| **helm-charts** | `charts/<team>/<app>/` | the chart itself — `Chart.yaml`, `values.yaml`, `templates/` |
+| **argohub** | `apps/<team>/<app>/base/values.yaml` | values common to every cluster |
+| | `apps/<team>/<app>/overlay/<cluster>/values.yaml` | per-cluster values — **this is where `image.tag` lives** |
+| | `argocd/application/apps/<team>/<app>/app-<cluster>.yaml` | one Argo `Application` CRD per cluster |
+
+**How the two projects join up — the multi-source `$values` pattern.** Each Application declares two sources: the chart from helm-charts, and argohub as a bare `ref: values` source contributing no manifests. The values files are then addressed through that ref, base first and overlay second, so the overlay wins:
+
+```yaml
+sources:
+  - repoURL: <helm-charts>
+    path: charts/demo-team/hello-app
+    targetRevision: main
+    helm:
+      valueFiles:
+        - $values/apps/demo-team/hello-app/base/values.yaml
+        - $values/apps/demo-team/hello-app/overlay/demo-stg/values.yaml
+  - repoURL: <argohub>
+    targetRevision: main
+    ref: values
+```
+
+Two consequences that decide what an AI has to edit. **The chart is consumed from a git path, not a chart version** — `targetRevision: main` means a chart change lands the moment its MR merges, with no version to bump. And **cluster is encoded in the filename, not the directory** (`app-demo-stg.yaml`, `app-demo-prd.yaml`), which is what makes the App of Apps shape matter below.
+
+**The environment is airgapped.** Charts are dragged and dropped in; nothing pulls from an external chart repo. Assume the same of everything else the PoC needs — MCP server images, chart dependencies, the inference endpoint. Nothing resolves from the public internet. (Mirroring the demo app's own container image is *not* a PoC concern — don't spend effort there.)
+
+Two cases, and the distinction matters because only one is cheap enough to demonstrate end to end.
+
+**New app onboarding** — spans both projects, so two MRs:
+
 ```
 AI     → ask the DE the necessary questions
-       → create a branch
-       → edit the scaffolding, values files and application files
-       → raise the MR, set the reviewer
+       → helm-charts:  branch → add the chart under charts/<team>/<app>
+                              → MR to main
+       → argohub:      branch → apps/<team>/<app>/base/values.yaml
+                              → apps/<team>/<app>/overlay/<cluster>/values.yaml
+                              → argocd/application/apps/<team>/<app>/app-<cluster>.yaml
+                                (one per target cluster)
+                              → MR to main
+       ── stops here ──
+HUMAN  → approve both MRs
+       → create the App of Apps by hand, then manually sync
+```
+
+**The App of Apps is always created by a human, never by the AI, and it does not live in argohub.** The AI's contribution stops at the Application CRDs that an AOA later sweeps up.
+
+Its shape is a real choice, and the layout is not neutral between them. **One AOA per app across all clusters** falls out naturally — point it at `argocd/application/apps/<team>/<app>/` and it picks up every `app-<cluster>.yaml` beneath. **One AOA per cluster** cannot be expressed as a directory at all, because cluster lives in the filename; it needs a `directory.include` glob such as `app-*-stg.yaml`. Establish which shape is in use before designing anything against it.
+
+**Existing app change** — the common case, and it touches **one project, one file**:
+
+```
+DE     → a team asks to bump a container image version, or change the chart
+AI     → ask which, and to what version — the DE may give the value, or
+         choose to edit the file themselves
+       → image bump  → argohub:     apps/<team>/<app>/overlay/<cluster>/values.yaml
+         chart change → helm-charts: charts/<team>/<app>/
+       → raise the MR
        ── stops here ──
 HUMAN  → approve the MR
-       → first time this app is onboarded?  create the App of Apps, then manually sync
-       → already onboarded?                 manually Argo sync
+       → Argo GUI → DIFF → manually sync
 ```
+
+An image bump never touches helm-charts, and a chart change never touches argohub. Neither needs the cross-project coordination that new-app onboarding does.
+
+**The DIFF-and-sync step is where 1.1.1 surfaces.** A faulty chart, or Argo objecting to something else, throws its error at exactly this moment. So the deploy flow (1.1.4) and *workload cannot be synced* (1.1.1) are one workflow observed at two moments, not two separate problems — a single injected fault can exercise both.
 
 The AI's entire deploy contribution is a branch, some file edits and an MR. Everything downstream is a person.
 
@@ -61,9 +128,29 @@ The AI's entire deploy contribution is a branch, some file edits and an MR. Ever
 
 - Kubernetes, with **Argo CD** as the CD tool.
 - **Starforge** is the org's platform team. DEs escalate to them for platform-level changes (e.g. Istio configuration).
-- Work happens on the **staging cluster**. Istio is in play.
+- Istio is in play.
+
+**Cluster topology.**
+
+| Cluster | Runs |
+|---|---|
+| **hub** | **GitLab and Argo CD** |
+| **stg, prd, prd2** | the workloads — the manifests the Helm charts render. **Istio troubleshooting is mainly needed here**, not on hub |
+
+**LibreChat and the MCP servers are portable — they can be deployed in any cluster.** They are not hub-resident, and nothing about the design pins them there. That is worth stating plainly because portability is one of the epic's evaluation criteria, and this is a point in the architecture's favour.
+
+Placement follows from what each server talks to, not from where the tooling "belongs":
+
+- **Cluster-scoped servers** — Kubernetes, k8sgpt, and an Istio server if one is adopted — read the cluster they run in, through an in-cluster ServiceAccount. To troubleshoot stg, run one in stg. Since Istio work is concentrated in stg and prd, that is where an Istio server goes.
+- **API-client servers** — Argo and GitLab — hold a token and talk to hub over the network. They run anywhere with a route to hub; where they sit is irrelevant.
+
+**The PoC runs on one cluster.** There aren't the resources for separate stg and prd, so everything collapses in-cluster — which is what the reference `Application` CRDs already do with `destination.server: https://kubernetes.default.svc`. Keep the `overlay/<cluster>/` directory shape anyway, because it is the org's real structure; just expect one overlay in the PoC.
+
+That single cluster models the co-located case honestly: an MCP server sitting alongside the workloads it reads is exactly the arrangement stg and prd would use. **The one thing it leaves untested is fan-out** — one LibreChat with a Kubernetes MCP server registered for stg *and* another for prd, where the LLM has two near-identical tool surfaces and has to pick the right cluster. That is a tool-selection question, and it belongs in the tool-selection row of RFC-2's matrix rather than being treated as a reach problem.
 - **~90% of real DE issues are networking.** This is why the pilot's fault catalogue is networking-weighted, and why Istio-layer visibility matters in the MCP server choice.
 - **The agent never writes to the cluster, and never triggers an Argo sync.** A standing rule. Write-capable Kubernetes MCP servers exist; their write flags stay off. Everything that lands goes through git, an MR, and a human.
+- **GitLab, Argo CD and Istio are not yet in the PoC environment.** LibreChat, k8sgpt and the Kubernetes MCP server are up; the other three have to be stood up on OpenShift before 1.1.1, 1.1.3 and 1.1.4 can be exercised at all. They gate three of the five sub-areas and both of the in-scope winner points that are not metrics — treat standing them up as experiment work, not setup overhead.
+- **Check the GitLab version before committing to the deploy path.** The official GitLab MCP server ships in-product from **18.5**. On an older airgapped instance winner point 1 has no supported server behind it, which changes the plan rather than the schedule — find out early.
 
 **Reaching the OpenShift dashboard metrics** (winner point 2a) — the facts, so nobody re-researches them:
 
@@ -96,45 +183,33 @@ See [plan.md](plan.md) for the schedule.
 
 So: before week 6, "write the RFC" is *not* the task. The task is running experiments and collecting scorecards. Don't let a future session start drafting conclusions it doesn't have evidence for yet.
 
-### House style for the RFC — read `example-of-rfc/example-rfc.md` first
+### House style for the RFCs
 
-The supervisor's note: the RFC should be **sharper, carrying only what decision-makers need**. [`example-of-rfc/example-rfc.md`](example-of-rfc/example-rfc.md) (EVAL-01) is the model. It makes a complete adopt/reject case in **99 lines**, almost entirely in tables. The current RFC-2 draft is three times that length and mostly prose — that gap is the work.
+**RFC-1 is the template. RFC-2 mirrors it.** Structure is: ToC → Motivation → Scope → Brief overview table → Options considered → Comparison matrix. Keep new RFCs in that shape.
 
-**The skeleton:**
+- **Motivation: two lines, then the question.** A short statement of the problem, then a separate paragraph opening *"The question this RFC answers: …"* which also names what follows in the next RFC. Both RFCs do this — match it.
+- **Brief overview table** compares candidates on the same rows: why it was built, maturity, what it adds, what is lost.
+- **Options are numbered** (`Option 1 — …`), and the numbers carry into the comparison-matrix column headers and the verdict list so a reader can walk between them.
+- **Comparison matrix** splits each decision driver into **Information** (the fact) and **Evaluation metric** (the judgement drawn from it). Cells stay **blank until tested** — a plausible guess defeats the point.
+- **Verdict is a numbered list with a named elimination factor per option**, in the same order as the options.
 
-| § | What goes in it |
-|---|---|
-| Metadata table | **Status (the verdict) first**, services evaluated, related docs, created, last reviewed. A decision-maker sees Go/No-Go in the first five lines |
-| Change log | Version, date, what changed, author. Each entry says whether the **verdict changed** — that's what tells a returning reader to re-read or not |
-| 1. The question this eval answers | **One sentence, answerable yes/no.** Nothing else |
-| 2. How the candidate works | Comparison table, one row per aspect, incumbent vs candidate. Bold the candidate's distinctive mechanism. No prose |
-| 3. Requirements | `R1…Rn`, each tagged `[Must-Have]` / `[Nice-to-Have]`, each with a **use case column giving the real situation that makes it a requirement** |
-| 4. Scorecard | Per requirement: verdict, finding, workaround. The heart of the document |
-| 5. Strengths the requirements don't capture | The "good to have" — but each one ends **"Becomes a requirement if/when ⟨condition⟩"** |
-| 6. Verdict | The call, a short paragraph of reasoning, **Revisit if:** ⟨condition⟩, **Decision date:** |
-| Appendix: Evidence | Requirement ID → link → **what the link confirms**. Not a URL dump |
+**`example-of-rfc/example-rfc.md` is a source of craft, not a skeleton.** It was tried as a template and rejected — don't restructure the RFCs around its metadata block, change log, `R1…Rn` requirements or Met/Gap/Unverified scorecard. What *is* worth stealing is how it stays sharp in 99 lines:
 
-**The rules that make it sharp:**
-
-- **Fixed scoring vocabulary, defined at the top of §4.** `Met` = confirmed · `Gap` = confirmed shortfall · `Unverified` = untested, **or a `[Must-Have]` with no magnitude** · `N/A`. That last clause matters most for us: *a must-have without a number is Unverified, not Met.*
-- **Quantify every finding or mark it Unverified.** The example writes "~2–3 min vs ~5s locally (~25–35x)", "3 of 4 repair primitives", "0 supported hook points". Never "slower" or "limited".
-- **Label workarounds `Accepted` / `Not accepted`.** An **Accepted** workaround must state **what would let it be dropped** — otherwise it's an unbounded concession.
-- **Say what you didn't test.** Two of the example's eight requirements are `Unverified` and it names exactly what's unchecked. That's what makes the rest credible.
+- **Quantify or say untested.** It writes "~2–3 min vs ~5s locally (~25–35x)", "3 of 4 repair primitives", "0 supported hook points" — never "slower" or "limited".
+- **Name what you didn't test.** Explicitly marking the gaps is what makes the rest credible.
 - **Tables carry the argument; prose only in the verdict.**
-- **Requirement IDs are traceable** — the same `R3` appears in requirements, scorecard, strengths and evidence, so any claim can be walked back to its source.
-- **Everything gets a revisit condition.** The doc is built to be re-read later, not filed.
-
-**One adaptation for our case.** EVAL-01 scores *one* candidate against requirements. We're comparing *several* LibreChat + MCP server combinations, so §4 needs a column per combination rather than a single verdict column. Requirements come from the [three winner points](#the-three-clear-winner-points), tagged Must-Have, with the DE problem sub-areas as their use cases.
+- **Everything gets a revisit condition** — "becomes a requirement if…", "re-check on first tagged release". The document is built to be re-read, not filed.
+- **A workaround you accept must state what would let it be dropped**, or it's an unbounded concession.
 
 Two things that are easy to get wrong:
 
-- **RFC-2 has an order of investigation, not a menu.** kubectl MCP first → then judge whether k8sgpt earns its place on top → then Argo MCP (read-only, for 1.1.1 diagnosis only) → then GitLab MCP → then a Prometheus-compatible MCP server. This is the reverse of how RFC-2's options section currently reads; the document catches up when it's written properly.
+- **RFC-2 has an order of investigation, not a menu.** kubectl MCP first → then judge whether k8sgpt earns its place on top → then Argo MCP (read-only, for 1.1.1 diagnosis only) → then GitLab MCP → then a Prometheus-compatible MCP server.
 - **Argo MCP is not a deploy path.** It exists for read-only 1.1.1 diagnosis. The deploy capability is GitLab MCP raising an MR — see the deploy flow above.
 
 Two things about RFC-1 that are easy to get wrong:
 
 - **RFC-1 settled the orchestrator, not the MCP server.** Its scoring paired LibreChat with k8sgpt as a reference implementation, and those cells are marked *(k8sgpt ref.)*. Don't read them as a decision that k8sgpt is the MCP server — that is exactly what RFC-2 is for.
-- **RFC-1's appendix preserves the kagent Collector/Diagnostician design, but kagent was eliminated.** The appendix is kept because the evidence-bundle schema, success criteria, and CrashLoopBackOff test-case table remain useful reference. It is not a live plan. Do not resurrect it as the architecture; if something in it is worth reusing, port the idea into the LibreChat + MCP design deliberately.
+- **RFC-1's appendix preserves the kagent Collector/Diagnostician design, but kagent was eliminated.** The appendix is kept just to show that we did our research.
 
 **Terminology:** LibreChat is the **orchestrator**; what sits behind it is the **MCP server** — never "the backend". ("MCP client" is still correct where the protocol role is what's meant, e.g. describing LibreChat's MCP support.) The org is on GitLab: say **MR**, not PR.
 
@@ -166,6 +241,8 @@ Different in kind from 1.1.1–1.1.3: those diagnose a deployment that broke, th
 The approval gate is the point, not a formality — it is what makes an AI-authored deployment acceptable at all, because a person verifies correctness before it lands.
 
 This is **winner point 1**, and the full flow is in [the deploy flow](#the-deploy-flow--where-ai-stops) above. It is the same mechanism whether the change is routine deployment work or a fix found while troubleshooting — don't build it twice.
+
+**Go at the existing-app case first.** It is one file in one project, and it is what DEs actually do most days; new-app onboarding is four file locations across two projects and two MRs. The pass bar is *one clean case reaching a raised MR* — the existing-app path clears it for a fraction of the build, and the new-app path can be attempted afterwards with nothing riding on it.
 
 ### 2.1 — monitoring dashboards · KIV
 
