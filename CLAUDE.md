@@ -141,7 +141,7 @@ The AI's entire deploy contribution is a branch, some file edits and an MR. Ever
 
 Placement follows from what each server talks to, not from where the tooling "belongs":
 
-- **Cluster-scoped servers** — Kubernetes, k8sgpt, and an Istio server if one is adopted — read the cluster they run in, through an in-cluster ServiceAccount. To troubleshoot stg, run one in stg. Since Istio work is concentrated in stg and prd, that is where an Istio server goes.
+- **Cluster-scoped servers** — Kubernetes, k8sgpt, and an Istio server if one is adopted — read the cluster they run in, through an in-cluster READ-ONLY ServiceAccount. To troubleshoot stg, run one in stg. Since Istio work is concentrated in stg and prd, that is where an Istio server goes.
 - **API-client servers** — Argo and GitLab — hold a token and talk to hub over the network. They run anywhere with a route to hub; where they sit is irrelevant.
 
 **The PoC runs on one cluster.** There aren't the resources for separate stg and prd, so everything collapses in-cluster — which is what the reference `Application` CRDs already do with `destination.server: https://kubernetes.default.svc`. Keep the `overlay/<cluster>/` directory shape anyway, because it is the org's real structure; just expect one overlay in the PoC.
