@@ -146,11 +146,25 @@ Placement follows from what each server talks to, not from where the tooling "be
 
 **The PoC runs on one cluster.** There aren't the resources for separate stg and prd, so everything collapses in-cluster — which is what the reference `Application` CRDs already do with `destination.server: https://kubernetes.default.svc`. Keep the `overlay/<cluster>/` directory shape anyway, because it is the org's real structure; just expect one overlay in the PoC.
 
-That single cluster models the co-located case honestly: an MCP server sitting alongside the workloads it reads is exactly the arrangement stg and prd would use. **The one thing it leaves untested is fan-out** — one LibreChat with a Kubernetes MCP server registered for stg *and* another for prd, where the LLM has two near-identical tool surfaces and has to pick the right cluster. That is a tool-selection question, and it belongs in the tool-selection row of RFC-2's matrix rather than being treated as a reach problem.
+That single cluster models the co-located case honestly: an MCP server sitting alongside the workloads it reads is exactly the arrangement stg and prd would use.
+
+**One LibreChat per cluster. Fan-out will never happen.** A single LibreChat with a Kubernetes MCP server registered for stg *and* another for prd — two near-identical tool surfaces the LLM has to choose between — is ruled out by design, not left untested. If stg needs LibreChat + X, deploy it in stg. If prd needs it, deploy a separate one in prd. Same for hub. Don't design against a multi-cluster tool surface, and don't score tool-selection-across-clusters in RFC-2.
+
+**The planned topology** — two independent deployments, each serving the sub-areas its servers can actually reach:
+
+| Where | LibreChat + | Serves |
+|---|---|---|
+| **stg** | Kubernetes MCP (± k8sgpt, if it earns its place) | 1.1.2 pod down / app broken · 1.1.3 Istio |
+| **hub** | GitLab MCP · Argo MCP · a Prometheus-compatible MCP | 1.1.4 deploy by MR · 1.1.1 Argo sync · 2.2 CPU/memory thresholds |
+
+The hub instance is cross-cluster *by nature*, and that does not contradict the no-fan-out rule: Argo and ACM's Thanos are already **aggregators** presenting one unified surface, not N identical ones. That is the difference that makes fan-out a problem and this not.
+
+**The open question this topology creates — 1.1.1.** An Argo sync failure has its cause on hub (sync status, failed hook, the error) but its symptom in stg (what partially got created, events, pod state). A hub-only LibreChat sees the Argo half directly. Whether Argo MCP's resource-tree, managed-resource and workload-log tools surface enough *stg* state through Argo's own cluster connections is untested — and it decides whether 1.1.1 is reachable from hub alone. Settle it in the stg runs before assuming either way.
 - **~90% of real DE issues are networking.** This is why the pilot's fault catalogue is networking-weighted, and why Istio-layer visibility matters in the MCP server choice.
 - **The agent never writes to the cluster, and never triggers an Argo sync.** A standing rule. Write-capable Kubernetes MCP servers exist; their write flags stay off. Everything that lands goes through git, an MR, and a human.
 - **GitLab, Argo CD and Istio are not yet in the PoC environment.** LibreChat, k8sgpt and the Kubernetes MCP server are up; the other three have to be stood up on OpenShift before 1.1.1, 1.1.3 and 1.1.4 can be exercised at all. They gate three of the five sub-areas and both of the in-scope winner points that are not metrics — treat standing them up as experiment work, not setup overhead.
 - **Check the GitLab version before committing to the deploy path.** The official GitLab MCP server ships in-product from **18.5**. On an older airgapped instance winner point 1 has no supported server behind it, which changes the plan rather than the schedule — find out early.
+- **No separate git MCP server is needed.** GitLab MCP covers the whole 1.1.4 flow itself: `create_branch`, create-or-update-file (project, path, content, commit message, branch), push multiple files in one commit, and create-merge-request with reviewers, assignees and labels. Adding a generic git server on top would duplicate the surface and give the LLM a second way to do the same thing.
 
 **Reaching the OpenShift dashboard metrics** (winner point 2a) — the facts, so nobody re-researches them:
 
@@ -159,6 +173,7 @@ That single cluster models the co-located case honestly: an MCP server sitting a
 - **Bearer token auth only**, via a ServiceAccount bound to the **`cluster-monitoring-view`** ClusterRole. Only `/api` paths are reachable on the route.
 - Red Hat advises no more than **one query per 30 seconds** — design any polling around that.
 - It speaks the Prometheus query API, so any Prometheus-compatible MCP server works pointed at it.
+- **ACM aggregates spoke metrics onto hub.** An `observability-endpoint-operator` on each managed cluster collects from that cluster's OCP Prometheus and pushes to a Thanos store on hub. So **one Prometheus MCP server on hub can serve hub, stg, prd and prd2** — no per-cluster server needed. **Verify first that ACM Observability is actually enabled, and that container CPU/memory are in its forwarded-metrics allowlist** — ACM forwards a curated set by default, not everything. If it isn't enabled, fall back to one server per cluster pointed at that cluster's own `thanos-querier`.
 
 Two verified facts worth not re-deriving:
 
