@@ -2,3 +2,5 @@
 # Never let `git add .` turn these into gitlinks
 LibreChat/
 kubernetes-mcp-server/
+miscellaneous/
+test-cases/
