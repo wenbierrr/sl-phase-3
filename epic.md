@@ -37,14 +37,18 @@ Any candidate solution is assessed against both sides of the ledger. Benefit is 
 
 # Tasks
 
-1. **Duty workload profiling** (~4 weeks) — Inventory recurring duty engineer chores, estimate time spent on each, and assess which are tractable for agent assistance. Output: recommended focus areas and a baseline for benefit measurement.
-2. **PoC and proposal** (~7 weeks) — Build against the recommended focus area; write up the proposal against the evaluation criteria above.
-3. **Gen AI for Platform Engineers 101** (~1 week) — Team enablement session.
-
-Total: ~12 weeks.
+1. **Duty workload profiling**— Inventory recurring duty engineer chores, estimate time spent on each, and assess which are tractable for agent assistance. Output: recommended focus areas and a baseline for benefit measurement.
+2. Evaluation of possible tools
+  - Evaluate librechat vs k8gpt vs kagent vs kubectl-ai
+  - Evaluate MCP servers k8gpt, kubectl and gitlab
+3.  DE trial of solution
+  - Plan and scope of trial (kubectl or gitlab)
+     - How is the execution of the trial 
+     - What is the scoring critieria of the trial
+4. RFC of solution
 
 # Acceptance criteria
 
-- [x] Written inventory of duty engineer chores with time estimates and agent-suitability assessment, presented to the team
-- [ ] Enablement material delivered in markdown and presented
-- [ ] Working PoC covering at least one
+- [ ] Trial of propose of solution by DE
+- [ ] RFC on choice of tools
+- [ ] `service-design` of solution if ADR go ahead

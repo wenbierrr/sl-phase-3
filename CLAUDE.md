@@ -15,9 +15,11 @@ Alongside them sit two upstream projects, cloned in place, each tracked by its o
 | `LibreChat/` | `chart-2.0.7-66-g8fcb77fe6` | `helm/librechat/values-sf.yaml`, plus chart edits for an optional `/app/uploads` volume |
 | `kubernetes-mcp-server/` | `v0.0.63-31-g9c6ef49` | `charts/kubernetes-mcp-server/values-sf.yaml`, `Dockerfile` patched for a containerd CVE |
 
-**The `-sf.yaml` files and the k8sgpt `serverInstructions` prompt inside them are the PoC's tuned configuration** — the thing weeks 1–3 exist to produce. They currently live only as uncommitted edits inside ignored directories, so a re-clone loses them. Treat them as deliverables, not scratch.
+**The `-sf.yaml` files and the `serverInstructions` prompts inside them are the PoC's tuned configuration** — the thing weeks 1–3 exist to produce. They currently live only as uncommitted edits inside ignored directories, so a re-clone loses them. Treat them as deliverables, not scratch.
 
 `miscellaneous/` holds environment deliverables: the Istio-on-CRC install guide and `gitlab-ce.yaml` — the single-container GitLab manifest the PoC runs on (see [PoC environment status](#poc-environment-status)).
+
+`test-cases/` holds the RCA benchmark — 9 fault charts and their answer keys: `README.md` covers tc1–tc4 (core Kubernetes), `README-istio.md` covers tc5–tc8 (Istio, including a three-namespace case), `README-argo.md` covers tc9 (Argo CD, delivered through GitLab rather than `helm install`). **The answer keys must stay off the cluster.** tc1–tc4's chart names name their own root cause, which a Secret read recovers; tc5–tc8 are deliberately uninformative for that reason. **tc9 goes further: its chart source is read by the GitLab MCP arm, so the chart itself carries no explanatory comment and no values key naming the remedy** — see its chart-hygiene rules before editing it.
 
 Deployment is by `helm install`/`upgrade` with `-f <chart>/values-sf.yaml`; the subchart `.tgz` files under `LibreChat/helm/librechat/charts/` are vendored deliberately — do not run `helm dependency update`.
 
@@ -126,6 +128,8 @@ RFC-1 settled the **orchestrator**: LibreChat. What sits behind it is the **MCP 
 - **The agent never writes to the cluster, never triggers an Argo sync, and never writes to git.** A standing rule (extended to git 11 Aug 2026), not a trade-off to re-weigh. Write-capable Kubernetes MCP servers exist; their write flags stay off. The GitLab token is read-only. Everything that lands is typed by a human.
 - **The gate is at the credential, not at the merge.** The org does not accept LibreChat holding a credential that can write to GitLab at all. Worth stating to stakeholders this way: an AI-authored commit is not something a reviewer has to catch — it cannot exist. The question "what if the AI commits something bad" has no attack surface rather than a mitigation.
 - **Read-only is not the same as safe — scope the read too.** k8sgpt's ClusterRole as deployed is `apiGroups: ['*'] / resources: ['*']` with get/list/watch, which **includes every Secret in the cluster** (verified). With a public inference endpoint in play, a secret read reaches chat, MongoDB conversation history and a third-party API. Prefer OpenShift's `cluster-reader`, which reads pods, nodes, PVs and NetworkPolicies cluster-wide but **excludes secrets** (verified). A prompt instruction saying "never read secrets" is advisory, not a control — it belongs in RBAC.
+- **On hub the wildcard role is a blocker, not a to-do (14 Aug 2026).** ACM generates Argo's cluster Secrets in `openshift-gitops`, and each holds a bearer token with near-admin rights on a spoke. A wildcard-read server on hub can therefore read **prd's cluster credentials** into a chat window. That is categorically worse than app secrets: tighten the role before anything runs on a real hub.
+- **Cluster-wide read also means the model wanders (observed 13 Aug 2026).** Asked about one namespace, it listed others and volunteered findings about an unrelated one. Constrained by `serverInstructions` for now — follow the request path, never browse — but the durable fix is RBAC.
 
 ### The deploy flow — where AI stops
 
@@ -211,6 +215,14 @@ An image bump never touches helm-charts, and a chart change never touches argohu
 
 **Starforge** is the org's platform team; DEs escalate to them for platform-level changes (e.g. Istio configuration).
 
+**How hub reaches the spokes — and what that puts within reach of a hub-side reader.** One Argo CD instance, on hub; spokes run none. Registration is done by **RHACM, not `argocd cluster add`**: each spoke joins as a `ManagedCluster`, a `ManagedClusterSet` is bound into `openshift-gitops`, a `Placement` selects eligible clusters, and a `GitOpsCluster` ties that Placement to Argo, which generates the cluster Secrets. Hub self-deployment is disabled (`cluster.inClusterEnabled: "false"`), so every workload Application must name a spoke.
+
+Three consequences that decide what a hub-side Kubernetes MCP server can diagnose:
+
+- **Every `Application` object lives in `openshift-gitops` on hub**; only `spec.destination` differs. So one server on hub reads sync state for *every* spoke — but that is Argo's record of the spoke, never the spoke itself.
+- **Env separation is by branch, not just path** — prd tracks `HEAD`/main, stg tracks a team branch `{cluster}/team/app_name`. Expect unresolvable-`targetRevision` to be a frequent 1.1.1 cause.
+- **The `default` AppProject is stripped of all rights**, with per-cluster AppProjects restricting destinations and repos. A guardrail design like this *generates* sync failures as its normal mode — "destination is not permitted in project" will be common, and both the error and the AppProject are readable on hub.
+
 **LibreChat and the MCP servers are portable — they can be deployed in any cluster.** Nothing pins them to hub, and portability is one of the epic's evaluation criteria — a point in the architecture's favour. Placement follows from what each server talks to:
 
 - Cluster troubleshooting (1.1.2) and Starforge config issues (1.1.3) live in stg → deploy LibreChat + Kubernetes MCP (or whichever server proves useful) **on stg**.
@@ -220,10 +232,14 @@ An image bump never touches helm-charts, and a chart change never touches argohu
 
 **The planned topology** — two independent deployments, each serving the sub-areas its servers can actually reach:
 
-| Where | LibreChat + | Serves |
-|---|---|---|
-| **stg** | Kubernetes MCP (± k8sgpt, if it earns its place) | 1.1.2 pod down / app broken · 1.1.3 Istio |
-| **hub** | GitLab MCP · Argo MCP · a Prometheus-compatible MCP | 1.1.4 deploy by MR · 1.1.1 Argo sync · 2.2 CPU/memory thresholds |
+| Where | LibreChat + | Serves | State |
+|---|---|---|---|
+| **stg** | Kubernetes MCP | 1.1.2 pod down / app broken · 1.1.3 Istio | baseline runs pass tc1–tc8 |
+| **hub** | Kubernetes MCP · **candidate: GitLab MCP and/or Argo MCP** · a Prometheus-compatible MCP | 1.1.4 deploy · 1.1.1 Argo sync · 2.2 CPU/memory thresholds | **being PoC'd — not chosen** |
+
+**Which servers go on hub is the open question, and it is decided by a cost-benefit comparison presented to stakeholders, not by this file.** Candidate combinations are Kubernetes MCP alone, + GitLab MCP, and + Argo MCP; the capability differences between them belong in RFC-2's matrix. Nothing here is a commitment.
+
+**Hub needs its own Kubernetes MCP server** whichever way that lands — a second deployment reading hub's API, not a second tool surface on one LibreChat. That is not fan-out: each instance reads exactly one cluster.
 
 The hub instance is cross-cluster *by nature*, and that does not contradict the no-fan-out rule: Argo and ACM's Thanos are already **aggregators** presenting one unified surface, not N identical ones.
 
@@ -248,7 +264,7 @@ The hub instance is cross-cluster *by nature*, and that does not contradict the 
 ### GitLab MCP — the read-side of the deploy flow
 
 - **GitLab MCP is a read-only server, and its job is grounding.** It no longer creates branches, commits files or raises MRs — those tools stay unused and the token must not carry the scope to call them. **A read-only token (`read_api` / `read_repository`) is the whole credential.** It lets the AI ground its drafted change in the real repo — find the right file among four candidate locations, read the current `image.tag`, follow existing conventions. Without it the AI guesses paths from memory, which is exactly where a wrong-but-plausible answer comes from. `project_id` is a per-call parameter, so one server reaches both `helm-charts` and `argohub` — do **not** add a second, generic git MCP server alongside it.
-- **Check the GitLab version early — it decides which server is available.** The official in-product GitLab MCP server ships from **18.5**. With writes ruled out, an older instance is no longer fatal to 1.1.4 (a read-only path has more options), but the version still decides the server choice. **Answered for CRC: CE 19.x ≥ 18.5, so the in-product server exists there.** The org's own instance still needs checking when it stands up.
+- **The working candidate is the community server** [`zereight/gitlab-mcp`](https://github.com/zereight/gitlab-mcp): it has `get_file_contents`, `get_repository_tree` and `list_branches`, supports `GITLAB_PERMISSION_MODE=readonly`, points at self-hosted instances via `GITLAB_API_URL`, and needs no GitLab Duo. Untested against our repos — that is the next PoC.
 - **Argo MCP is not a deploy path.** It exists for read-only 1.1.1 diagnosis only. The deploy capability is GitLab MCP *reading* the repos.
 
 ### Reaching the OpenShift dashboard metrics (winner point 2a)
@@ -267,7 +283,8 @@ The facts, so nobody re-researches them:
 - **The `view` ClusterRole does not cover Istio CRDs — verified, all seven return `no`.** An MCP server bound only to `view` gets 403 on VirtualServices, DestinationRules, AuthorizationPolicies and PeerAuthentications, which reads exactly like "kubectl cannot diagnose mesh faults" when it is a permissions bug. Bind an additional minimal read-only ClusterRole over `networking.istio.io`, `security.istio.io`, `telemetry.istio.io` and `extensions.istio.io`. Do **not** bind Istio's own `istio-reader-clusterrole-istio-system`: it grants cluster-wide `secrets` reads and carries `create`/`delete` on `serviceexports`. Run this check on every cluster before any 1.1.3 case.
 - **CRC currently sidesteps this (12 Aug 2026):** the Kubernetes MCP server binds a custom wildcard ClusterRole — `get/list/watch` on `*/*`, defined in its `values-sf.yaml` — verified to read all Istio kinds and to refuse writes. It also reads Secrets: acceptable for CRC exploration only; tighten to an enumerated-core-group-minus-secrets role before any DE rollout.
 - **k8sgpt's MCP server exposes 12 tools and none write cluster state** ([MCP.md](https://github.com/k8sgpt-ai/k8sgpt/blob/main/MCP.md)). It also cannot reach metrics.
-- **k8sgpt ships no Istio analyzers.** Sub-area 1.1.3 likely needs a separate read-only Istio MCP server.
+- **k8sgpt ships no Istio analyzers.** Confirmed by tc5–tc8: it cannot see any of them. (A separate Istio MCP server turned out not to be needed — the Kubernetes MCP server reads Istio CRDs fine under the wildcard role.)
+- **Argo MCP's tool surface — verified 14 Aug 2026.** [`mcp-for-argocd`](https://github.com/argoproj-labs/mcp-for-argocd) exposes 14 tools. Three reach into spokes through Argo's own cluster credentials: `get_application_workload_logs` (pod logs), `get_resource_events`, `get_application_managed_resources`. **Five are writes** — `create/update/delete_application`, `sync_application`, `run_resource_action` — and must stay disabled. Note the reach it buys from hub is the same reach a spoke-side LibreChat has natively, and narrower: Argo sees only what it manages, so out-of-tree causes (a webhook, a quota, a NetworkPolicy no Application owns) are invisible to it either way.
 
 ## PoC environment status
 
@@ -289,10 +306,13 @@ Against the epic's acceptance criteria:
 
 The ordering matters: **criterion 2 outranks criterion 3**, and criterion 3 is conditional. If the PoC stalls, the RFCs still land and the deliverable is still met — don't sacrifice the written work to keep a PoC moving.
 
-**Two gaps worth naming, because they decide what the next runs are for:**
+**Where the runs stand (14 Aug 2026):**
 
-- **The kubectl arm has zero results.** Every case so far ran against k8sgpt. Since kubectl is a strict superset of k8sgpt on reach, the only live question is whether k8sgpt adds *reliability* on the cases both can see — unanswerable until the same cases run kubectl-only. The Kubernetes MCP server also still has no `serverInstructions` while k8sgpt has a tuned block; until that is evened up a comparison measures tuning effort, not capability.
-- **The 4 CRC cases are one-glance** — OOM, liveness-probe port, Service selector, default-deny-ingress. Each resolves from a single object, which is why k8sgpt swept them. They give baseline confidence that the plumbing works; they are not evidence, and they cannot separate the arms.
+- **The benchmark is 9 cases.** tc1–tc4 core Kubernetes (OOM · liveness-probe port · Service selector · default-deny-ingress); tc5–tc7 Istio (no sidecar vs STRICT mTLS · AuthorizationPolicy deny · undefined routing subset); **tc8** a three-namespace `exportTo` visibility fault where the symptom is two hops from the cause and a correct AuthorizationPolicy sits in the path as a decoy; **tc9** an Argo 1.1.1 case — a self-deleting `Job` compared as permanent drift. **tc9 is written but not yet run.**
+- **tc9 is the first case built to discriminate between server combinations.** tc1–tc8 were all passed by LibreChat + Kubernetes MCP alone, so every matrix column reads the same and they separate nothing. tc9 is gradeable by reach: the Kubernetes MCP arm gets the Application CR and the deleted Job's surviving events but never the Job's spec; the GitLab MCP arm gets the chart source and a correctly-hooked counterpart Job as a worked example; the Argo MCP arm gets the desired manifest but not the counterpart. It also inverts the usual failure mode — **the correct answer includes "no workload is broken"**, so inventing a fault to explain a red Application is the thing being caught.
+- **LibreChat + Kubernetes MCP passed all 8 first try** — root cause and suggested fix correct, no hallucinations, and with **no `serverInstructions` in force at all**.
+- **k8sgpt eliminated.** What LibreChat + k8sgpt can troubleshoot is a proper subset of what LibreChat + Kubernetes MCP can: it ships no Istio analyzers, so tc5–tc8 are invisible to it, and it needs 45 lines of tuning to handle the four it can see. **Elimination factor: no reliability advantage on the shared cases, no reach on the rest, and a prompt to maintain forever.**
+- **Still baseline confidence, not evidence** — injected faults, injector knows the answers, single-fault namespaces. tc8's run was also **contaminated**: tc5–tc7 were live in the same cluster and the wildcard read role let the model read tc7, which is the case tc8 is built to resemble. Re-run it isolated before citing it.
 
 **Supervisor steer (Aug 2026), and it outranks more fabricated cases:** unit-test-style cases only establish baseline confidence. What convinces stakeholders is the tool against **real stg issues**, with the fault catalogue derived from **incidents that actually recur on our clusters** — then replicated on stg with DEs using it. Mining that incident history is research work needing no cluster, so it runs in parallel with everything else.
 
@@ -358,6 +378,8 @@ Two criteria are worth watching even during exploration, because they affect whe
 **Answers first, RFC last.** Weeks 1–5 find out whether LibreChat + X is useful and in which combination; weeks 6–8 write it up. Before week 6, "write the RFC" is *not* the task — running experiments and collecting scorecards is. Don't let a future session draft conclusions it doesn't have evidence for.
 
 **RFC-2 has an order of investigation, not a menu:** kubectl MCP first → then judge whether k8sgpt earns its place on top → then Argo MCP (read-only, 1.1.1 diagnosis only) → then GitLab MCP → then a Prometheus-compatible MCP server.
+
+**Progress (14 Aug 2026):** kubectl MCP done · k8sgpt eliminated · **GitLab MCP is next**, moved ahead of Argo MCP because it is the only candidate that reaches 1.1.4 at all. Argo MCP still gets tested; what it is weighed against is whether a spoke-side LibreChat already covers the same ground.
 
 Two things about RFC-1 that are easy to get wrong:
 
