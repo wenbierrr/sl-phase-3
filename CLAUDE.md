@@ -6,20 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository state
 
-**Mostly documents, plus two vendored upstream repos.** The tracked content is `epic.md`, `plan.md`, the RFC series and `README.md` — no build system or test suite of our own, so no build/lint/test commands to document.
+**Mostly documents, plus three vendored upstream repos.** The tracked content is `epic.md`, `plan.md`, `DE-trial-execution.md`, the RFC series and `README.md` — no build system or test suite of our own, so no build/lint/test commands to document.
 
-Alongside them sit two upstream projects, cloned in place, each tracked by its own `.git` and excluded via `.gitignore` so `git add .` cannot turn them into gitlinks:
+Alongside them sit three upstream projects, cloned in place, each tracked by its own `.git` and excluded via `.gitignore` so `git add .` cannot turn them into gitlinks:
 
 | Directory | Upstream at | Local changes |
 |---|---|---|
 | `LibreChat/` | `chart-2.0.7-66-g8fcb77fe6` | `helm/librechat/values-sf.yaml`, plus chart edits for an optional `/app/uploads` volume |
 | `kubernetes-mcp-server/` | `v0.0.63-31-g9c6ef49` | `charts/kubernetes-mcp-server/values-sf.yaml`, `Dockerfile` patched for a containerd CVE |
+| `gitlab-mcp/` | `zereight/gitlab-mcp` `v2.1.46-3-g926d42c` | none yet — cloned 14 Aug 2026, untested |
 
-**The `-sf.yaml` files and the `serverInstructions` prompts inside them are the PoC's tuned configuration** — the thing weeks 1–3 exist to produce. They currently live only as uncommitted edits inside ignored directories, so a re-clone loses them. Treat them as deliverables, not scratch.
+**The `-sf.yaml` files and the `serverInstructions` prompts inside them are the PoC's tuned configuration** — the thing weeks 1–2 exist to produce. They currently live only as uncommitted edits inside ignored directories, so a re-clone loses them. Treat them as deliverables, not scratch.
 
 `miscellaneous/` holds environment deliverables: the Istio-on-CRC install guide and `gitlab-ce.yaml` — the single-container GitLab manifest the PoC runs on (see [PoC environment status](#poc-environment-status)).
 
 `test-cases/` holds the RCA benchmark — 9 fault charts and their answer keys: `README.md` covers tc1–tc4 (core Kubernetes), `README-istio.md` covers tc5–tc8 (Istio, including a three-namespace case), `README-argo.md` covers tc9 (Argo CD, delivered through GitLab rather than `helm install`). **The answer keys must stay off the cluster.** tc1–tc4's chart names name their own root cause, which a Secret read recovers; tc5–tc8 are deliberately uninformative for that reason. **tc9 goes further: its chart source is read by the GitLab MCP arm, so the chart itself carries no explanatory comment and no values key naming the remedy** — see its chart-hygiene rules before editing it.
+
+**`test-cases/` and `miscellaneous/` are gitignored but are *not* git repos.** Unlike the vendored projects they have no `.git` of their own, so the 9 fault charts, every answer key, `gitlab-ce.yaml` and the Istio guide are versioned nowhere. A `git init` in each closes it.
 
 Deployment is by `helm install`/`upgrade` with `-f <chart>/values-sf.yaml`; the subchart `.tgz` files under `LibreChat/helm/librechat/charts/` are vendored deliberately — do not run `helm dependency update`.
 
@@ -116,6 +119,8 @@ The spike work sits here rather than under 2.1 because Starforge is the team tha
 ### Scope
 
 **In scope for RFC-2:** all of 1.1 (1.1.1–1.1.4) and 2.2. One architecture is being tested against all of it — that is the point of a single RFC. **KIV, not in scope:** 2.1, the Grafana Kafka-throughput side.
+
+**The DE trial is narrower than RFC-2 (Aug 2026): it covers 1.1.1–1.1.3 only.** 1.1.4 is tested by the author personally, not by DEs; 2.2 is not in the trial at all. Never present the trial's result as evidence for either.
 
 Don't build generic "handles everything" tooling. A combination that convincingly handles Argo sync failures beats one that shallowly touches every sub-area — and a clean "this combination doesn't help here" is a better finding than a stretched claim that it does.
 
@@ -235,9 +240,9 @@ Three consequences that decide what a hub-side Kubernetes MCP server can diagnos
 | Where | LibreChat + | Serves | State |
 |---|---|---|---|
 | **stg** | Kubernetes MCP | 1.1.2 pod down / app broken · 1.1.3 Istio | baseline runs pass tc1–tc8 |
-| **hub** | Kubernetes MCP · **candidate: GitLab MCP and/or Argo MCP** · a Prometheus-compatible MCP | 1.1.4 deploy · 1.1.1 Argo sync · 2.2 CPU/memory thresholds | **being PoC'd — not chosen** |
+| **hub** | Kubernetes MCP · **candidate: GitLab MCP** · a Prometheus-compatible MCP | 1.1.4 deploy · 1.1.1 Argo sync · 2.2 CPU/memory thresholds | **being PoC'd — not chosen** |
 
-**Which servers go on hub is the open question, and it is decided by a cost-benefit comparison presented to stakeholders, not by this file.** Candidate combinations are Kubernetes MCP alone, + GitLab MCP, and + Argo MCP; the capability differences between them belong in RFC-2's matrix. Nothing here is a commitment.
+**Which servers go on hub is the open question, and it is decided by a cost-benefit comparison presented to stakeholders, not by this file.** Candidate combinations are Kubernetes MCP alone and + GitLab MCP; the capability differences between them belong in RFC-2's matrix. Nothing here is a commitment.
 
 **Hub needs its own Kubernetes MCP server** whichever way that lands — a second deployment reading hub's API, not a second tool surface on one LibreChat. That is not fan-out: each instance reads exactly one cluster.
 
@@ -253,19 +258,19 @@ The hub instance is cross-cluster *by nature*, and that does not contradict the 
 
 **The first class is the biggest slice, and it is hub-complete.** The `$values` pattern gives it the surface — four addressable paths across two projects, cluster in the filename, chart pinned to `targetRevision: main`. Each of those fails at manifest generation, where the error is on hub and needs nothing from stg.
 
-**So the real question is not "does Argo MCP see stg" — it is "is the root cause inside this Application's resource tree".** Argo's API proxies into the destination cluster for the resources it manages, so in-tree state is likely reachable; an out-of-tree cause (a NetworkPolicy no Application owns, an admission policy, a webhook config) is not, because Argo does not know it exists. Untested against `mcp-for-argocd` — a blank cell until it is run.
+**With Argo MCP excluded, 1.1.1 is diagnosed by the Kubernetes MCP server reading the `Application` CR** — `status.conditions`, `status.sync`, `status.resources[]`. That covers the first class outright, since the error text is on hub and self-explaining.
 
 **Classify before scoring.** DEs report Synced-but-Degraded as "Argo is red", but manifests that applied cleanly with a pod that won't start is 1.1.2, not 1.1.1.
 
 **The PoC collapses this onto one cluster.** There aren't the resources for separate stg and prd — which is what the reference `Application` CRDs already do with `destination.server: https://kubernetes.default.svc`. Keep the `overlay/<cluster>/` directory shape anyway, because it is the org's real structure. The single cluster models the co-located case honestly: an MCP server sitting alongside the workloads it reads is exactly the arrangement stg and prd would use.
 
-**What it cannot settle is the placement half of 1.1.1.** With `kubernetes.default.svc`, hub *is* stg — no boundary, no second credential, no hop that could fail — so a hub-placed server sees stg state for free and a pass there says nothing about the org's real split. What CRC does settle is narrower and still worth having: whether Argo MCP's tools return usable data for a sync failure at all. Placement waits for a real spoke; don't record a CRC pass as having answered it.
+**What it cannot settle is the placement half of 1.1.1.** With `kubernetes.default.svc`, hub *is* stg — no boundary, no second credential, no hop that could fail — so a hub-placed server sees stg state for free and a pass there says nothing about the org's real split. Placement waits for a real spoke; don't record a CRC pass as having answered it.
 
 ### GitLab MCP — the read-side of the deploy flow
 
 - **GitLab MCP is a read-only server, and its job is grounding.** It no longer creates branches, commits files or raises MRs — those tools stay unused and the token must not carry the scope to call them. **A read-only token (`read_api` / `read_repository`) is the whole credential.** It lets the AI ground its drafted change in the real repo — find the right file among four candidate locations, read the current `image.tag`, follow existing conventions. Without it the AI guesses paths from memory, which is exactly where a wrong-but-plausible answer comes from. `project_id` is a per-call parameter, so one server reaches both `helm-charts` and `argohub` — do **not** add a second, generic git MCP server alongside it.
 - **The working candidate is the community server** [`zereight/gitlab-mcp`](https://github.com/zereight/gitlab-mcp): it has `get_file_contents`, `get_repository_tree` and `list_branches`, supports `GITLAB_PERMISSION_MODE=readonly`, points at self-hosted instances via `GITLAB_API_URL`, and needs no GitLab Duo. Untested against our repos — that is the next PoC.
-- **Argo MCP is not a deploy path.** It exists for read-only 1.1.1 diagnosis only. The deploy capability is GitLab MCP *reading* the repos.
+- **GitLab MCP is evaluated by the author in tandem with the DE trial, not inside it.** The trial covers 1.1.1–1.1.3; GitLab MCP's job is 1.1.4. Its output is the cost-benefit analysis, not a scorecard.
 
 ### Reaching the OpenShift dashboard metrics (winner point 2a)
 
@@ -284,7 +289,7 @@ The facts, so nobody re-researches them:
 - **CRC currently sidesteps this (12 Aug 2026):** the Kubernetes MCP server binds a custom wildcard ClusterRole — `get/list/watch` on `*/*`, defined in its `values-sf.yaml` — verified to read all Istio kinds and to refuse writes. It also reads Secrets: acceptable for CRC exploration only; tighten to an enumerated-core-group-minus-secrets role before any DE rollout.
 - **k8sgpt's MCP server exposes 12 tools and none write cluster state** ([MCP.md](https://github.com/k8sgpt-ai/k8sgpt/blob/main/MCP.md)). It also cannot reach metrics.
 - **k8sgpt ships no Istio analyzers.** Confirmed by tc5–tc8: it cannot see any of them. (A separate Istio MCP server turned out not to be needed — the Kubernetes MCP server reads Istio CRDs fine under the wildcard role.)
-- **Argo MCP's tool surface — verified 14 Aug 2026.** [`mcp-for-argocd`](https://github.com/argoproj-labs/mcp-for-argocd) exposes 14 tools. Three reach into spokes through Argo's own cluster credentials: `get_application_workload_logs` (pod logs), `get_resource_events`, `get_application_managed_resources`. **Five are writes** — `create/update/delete_application`, `sync_application`, `run_resource_action` — and must stay disabled. Note the reach it buys from hub is the same reach a spoke-side LibreChat has natively, and narrower: Argo sees only what it manages, so out-of-tree causes (a webhook, a quota, a NetworkPolicy no Application owns) are invisible to it either way.
+- **Argo MCP's tool surface — verified 14 Aug 2026, kept as the basis for its exclusion.** [`mcp-for-argocd`](https://github.com/argoproj-labs/mcp-for-argocd) exposes 14 tools, **five of them writes** (`create/update/delete_application`, `sync_application`, `run_resource_action`). The reach it buys from hub is the same reach a spoke-side LibreChat has natively, and narrower — Argo sees only what it manages, so out-of-tree causes (a webhook, a quota, a NetworkPolicy no Application owns) are invisible to it either way. **That is the elimination factor for RFC-2.**
 
 ## PoC environment status
 
@@ -300,21 +305,27 @@ Two environments: **stg** (org cluster — LibreChat + k8sgpt) and **CRC** (loca
 
 Against the epic's acceptance criteria:
 
-- ✅ **Written inventory of DE chores** with time estimates and agent-suitability assessment — done and presented. This drove the focus decision above.
-- 🔨 **Enablement material in markdown, presented** — **this means the RFCs, PoC write-ups and research**, not a training session. Highest-priority live deliverable; it accumulates continuously. (Don't confuse it with "Gen AI for Platform Engineers 101" — that session is epic task 3, currently parked.)
-- 🔄 **Working PoC** covering at least one focus area — **continuous.** Concretely: LibreChat plus the chosen MCP server(s) on stg, in DEs' hands, against fabricated and real failures.
-
-The ordering matters: **criterion 2 outranks criterion 3**, and criterion 3 is conditional. If the PoC stalls, the RFCs still land and the deliverable is still met — don't sacrifice the written work to keep a PoC moving.
+- 🔨 **Trial of the proposed solution by DE** — designed and agreed; runs weeks 3–5. Detail in [DE-trial-execution.md](DE-trial-execution.md).
+- 🔨 **RFC on choice of tools** — [RFC-1](rfc-1-ai-tool-evaluation.md) done (orchestrator); [RFC-2](rfc-2-mcp-server-eval-for-librechat.md) active, written weeks 6–8 from the trial's scorecards.
+- ⏸️ **`service-design` of the solution, if the ADR goes ahead** — production security, RBAC, rollout. Same artifact this file calls RFC-X. Conditional; may never be written.
 
 **Where the runs stand (14 Aug 2026):**
 
 - **The benchmark is 9 cases.** tc1–tc4 core Kubernetes (OOM · liveness-probe port · Service selector · default-deny-ingress); tc5–tc7 Istio (no sidecar vs STRICT mTLS · AuthorizationPolicy deny · undefined routing subset); **tc8** a three-namespace `exportTo` visibility fault where the symptom is two hops from the cause and a correct AuthorizationPolicy sits in the path as a decoy; **tc9** an Argo 1.1.1 case — a self-deleting `Job` compared as permanent drift. **tc9 is written but not yet run.**
-- **tc9 is the first case built to discriminate between server combinations.** tc1–tc8 were all passed by LibreChat + Kubernetes MCP alone, so every matrix column reads the same and they separate nothing. tc9 is gradeable by reach: the Kubernetes MCP arm gets the Application CR and the deleted Job's surviving events but never the Job's spec; the GitLab MCP arm gets the chart source and a correctly-hooked counterpart Job as a worked example; the Argo MCP arm gets the desired manifest but not the counterpart. It also inverts the usual failure mode — **the correct answer includes "no workload is broken"**, so inventing a fault to explain a red Application is the thing being caught.
+- **tc9 is the first case built to discriminate between server combinations.** tc1–tc8 were all passed by LibreChat + Kubernetes MCP alone, so every matrix column reads the same and they separate nothing. tc9 is gradeable by reach: the Kubernetes MCP arm gets the Application CR and the deleted Job's surviving events but never the Job's spec; the GitLab MCP arm gets the chart source and a correctly-hooked counterpart Job as a worked example. (Its third arm was Argo MCP, now excluded.) It also inverts the usual failure mode — **the correct answer includes "no workload is broken"**, so inventing a fault to explain a red Application is the thing being caught.
 - **LibreChat + Kubernetes MCP passed all 8 first try** — root cause and suggested fix correct, no hallucinations, and with **no `serverInstructions` in force at all**.
 - **k8sgpt eliminated.** What LibreChat + k8sgpt can troubleshoot is a proper subset of what LibreChat + Kubernetes MCP can: it ships no Istio analyzers, so tc5–tc8 are invisible to it, and it needs 45 lines of tuning to handle the four it can see. **Elimination factor: no reliability advantage on the shared cases, no reach on the rest, and a prompt to maintain forever.**
 - **Still baseline confidence, not evidence** — injected faults, injector knows the answers, single-fault namespaces. tc8's run was also **contaminated**: tc5–tc7 were live in the same cluster and the wildcard read role let the model read tc7, which is the case tc8 is built to resemble. Re-run it isolated before citing it.
 
 **Supervisor steer (Aug 2026), and it outranks more fabricated cases:** unit-test-style cases only establish baseline confidence. What convinces stakeholders is the tool against **real stg issues**, with the fault catalogue derived from **incidents that actually recur on our clusters** — then replicated on stg with DEs using it. Mining that incident history is research work needing no cluster, so it runs in parallel with everything else.
+
+**The DE trial, agreed Aug 2026** — full detail in [DE-trial-execution.md](DE-trial-execution.md):
+
+- **8 scenarios, 17 scorecards** (scenarios repeat across DEs), covering 1.1.1–1.1.3. Each case timeboxed to 30 min.
+- **Rubric: Resolution quality · Time saved · Actionability**, each graded 1–3 (No Go / OK / Good).
+- **Pass bar: ≥ 12 of 17 Good (71%) per criterion, no hallucinations**, plus a per-failure-type floor so one strong type cannot carry the trial.
+- **`Non-SF` is the agreed proxy for "less experienced"** — SF are the platform specialists. Winner point 3 is scored on that basis.
+- **Time saved is a graded criterion and it gates.** The supervisor's call, overriding the general rule below that a DE estimate must not gate a decision. Don't revert it.
 
 See [plan.md](plan.md) for the 8-week schedule. When the active work changes, update this section and plan.md together.
 
@@ -332,7 +343,7 @@ Whichever is used, state the method and its limits alongside the result.
 
 **This bites concretely on RFC-2's pilot scorecard.** Two fields sit on opposite sides of the line:
 
-- *"Roughly how long without the tool?"* — a **DE estimate**. It stays labelled that way everywhere, and is deliberately excluded from the pass bars: an estimate must not gate a decision. The failure mode is quiet — an estimate hardening into a measured figure between scorecard and decision memo.
+- *"Roughly how long without the tool?"* — a **DE estimate**, and it stays labelled that way everywhere. The failure mode is quiet — an estimate hardening into a measured figure between scorecard and decision memo. **Partly superseded (Aug 2026):** on the supervisor's steer, time saved is now a graded rubric criterion that *does* gate, banded (0% · <30% · ≥30%) rather than a precise figure. Keep the banding; never restore a raw number.
 - *"Without the tool, would this have been escalated?"* — needs no baseline, is countable, and maps straight onto the toil the epic set out to reduce. Lead with this one.
 
 **The stg runs are not evidence — the pilot is.** Conflating them is the easiest way to overstate the case.
@@ -356,7 +367,7 @@ Whichever is used, state the method and its limits alongside the result.
 
 **Exploration** — the RFC-1/RFC-2 work: trying tools, spiking, running stg cases. The criteria do not apply. Don't build RBAC, audit trails, or platform abstraction here. Hack freely against stg.
 
-**Promotion** — the boundary is concrete: **RFC-2's Day-0 thresholds**, agreed by the team *before* any pilot data exists, scored at the end of the pilot week. Passing means proceeding to RFC-X (production security, RBAC wiring, rollout) — not to production directly. Two notes: the thresholds include a bar for **the AI drafting a change the DE applies unmodified** (one clean case — what remains of winner point 1), and **DE-estimated time saved is deliberately not among them**.
+**Promotion** — the boundary is concrete: **RFC-2's Day-0 thresholds**, agreed by the team *before* any pilot data exists, scored at the end of the pilot week. Passing means proceeding to RFC-X (production security, RBAC wiring, rollout) — not to production directly. Two notes: the drafted-change bar (winner point 1) is assessed **by the author personally, not by the DE trial**, and **DE-estimated time saved *is* among the thresholds since Aug 2026** — the supervisor's call, banded rather than precise.
 
 The gate is a real filter: a tool can be impressive in exploration and still fail on unbounded blast radius, no DE-identity mapping in the audit trail, or an uncarryable maintenance burden. Fixing the thresholds before the data exists is what stops them being quietly relaxed to fit a result. Don't let a spike drift toward production without passing the gate, and don't silently apply gate-level engineering to something still being explored. A failed gate that names its elimination factor is a valid answer to the epic's question, not a failed project.
 
@@ -377,9 +388,11 @@ Two criteria are worth watching even during exploration, because they affect whe
 
 **Answers first, RFC last.** Weeks 1–5 find out whether LibreChat + X is useful and in which combination; weeks 6–8 write it up. Before week 6, "write the RFC" is *not* the task — running experiments and collecting scorecards is. Don't let a future session draft conclusions it doesn't have evidence for.
 
-**RFC-2 has an order of investigation, not a menu:** kubectl MCP first → then judge whether k8sgpt earns its place on top → then Argo MCP (read-only, 1.1.1 diagnosis only) → then GitLab MCP → then a Prometheus-compatible MCP server.
+**RFC-2 has an order of investigation, not a menu:** k8sgpt first → then Kubernetes MCP, which superseded it → then GitLab MCP → then a Prometheus-compatible MCP server. **Argo MCP was dropped from the order (Aug 2026)** and never tested.
 
-**Progress (14 Aug 2026):** kubectl MCP done · k8sgpt eliminated · **GitLab MCP is next**, moved ahead of Argo MCP because it is the only candidate that reaches 1.1.4 at all. Argo MCP still gets tested; what it is weighed against is whether a spoke-side LibreChat already covers the same ground.
+**Progress (Aug 2026):** kubectl MCP done · k8sgpt eliminated · **Argo MCP excluded** — not tested, not in the trial. RFC-2 needs a named elimination factor for it and its matrix column closes.
+
+**The plan from here:** bring the Kubernetes MCP server into the **airgapped environment**, then run the DE trial on it. **In tandem**, the author evaluates GitLab MCP and produces the cost-benefit analysis. GitLab MCP is not in the DE trial — it reaches 1.1.4, which the trial excludes.
 
 Two things about RFC-1 that are easy to get wrong:
 

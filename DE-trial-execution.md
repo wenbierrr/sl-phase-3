@@ -9,27 +9,26 @@
 
 ## How the DE trial is conducted
 
+LibreChat + the Kubernetes MCP server is deployed on **stg**, not hub. Argo CD runs on hub, so no `Application` object is readable from stg —> **Argo sync failures are out of the trial entirely.**
+
 | Failure type | Scenarios | DEs each | Scorecards |
 |---|---|---|---|
-| Argo sync failure | 2 | 2 (Non-SF) | **4** |
 | Argo synced, but workload down | 2 | 2 (Non-SF) | **4** |
 | Kubernetes-native networking | 2 | 2 (Non-SF) | **4** |
 | Istio — configure the ingress gateway to route traffic to Keycloak for authentication | 1 | 3 (Non-SF) | **3** |
 | Istio — mesh networking fault | 1 | 2 (SF) | **2** |
-| | **8** | | **17** |
+| | **6** | | **13** |
 
-**The 8 test cases**
+**The 6 test cases**
 
 | # | Type | Scenario | Tested on |
 |---|---|---|---|
-| 1 | Argo sync failure | `values.yaml` file path wrong | 2 Non-SF |
-| 2 | Argo sync failure | Job auto-deletes after finishing → Argo still expects it → OutOfSync forever but nothing actually broken | 2 Non-SF |
-| 3 | Workload down | Deployment pins `runAsUser`/`fsGroup` → OpenShift SCC rejects it | 2 Non-SF |
-| 4 | Workload down | Liveness probe targets the wrong port → kubelet kills the container | 2 Non-SF |
-| 5 | K8s networking | `default-deny-ingress` NetworkPolicy → connection times out | 2 Non-SF |
-| 6 | K8s networking | Service selector doesn't match the pod labels → no endpoints → connection refused | 2 Non-SF |
-| 7 | Istio config task | Configure the ingress gateway to route traffic to Keycloak | 3 Non-SF |
-| 8 | Istio complex | mTLS enforced on an app (`PeerAuthentication: STRICT`), but a `DestinationRule` sets `tls.mode: DISABLE` for the same host → caller sends plaintext, server demands mTLS | 2 SF |
+| 1 | Workload down | Deployment pins `runAsUser`/`fsGroup` → OpenShift SCC rejects it | 2 Non-SF |
+| 2 | Workload down | Liveness probe targets the wrong port → kubelet kills the container | 2 Non-SF |
+| 3 | K8s networking | `default-deny-ingress` NetworkPolicy → connection times out | 2 Non-SF |
+| 4 | K8s networking | Service selector doesn't match the pod labels → no endpoints → connection refused | 2 Non-SF |
+| 5 | Istio config task | Configure the ingress gateway to route traffic to Keycloak | 3 Non-SF |
+| 6 | Istio complex | mTLS enforced on an app (`PeerAuthentication: STRICT`), but a `DestinationRule` sets `tls.mode: DISABLE` for the same host → caller sends plaintext, server demands mTLS | 2 SF |
 
 
 
@@ -57,7 +56,7 @@ Those three become the criteria. Each is graded 1–3, so a case records not jus
 
 One per case, filled in by the DE as soon as the case closes.
 
-**Case:** `___`;  **DE:** `___`;  **Team:** ○ SF ○ Non-SF; **Sub-area:** ○ 1.1.1 ○ 1.1.2 ○ 1.1.3
+**Case:** `___`;  **DE:** `___`;  **Team:** ○ SF ○ Non-SF
 
 | | |
 |---|---|
@@ -69,19 +68,18 @@ One per case, filled in by the DE as soon as the case closes.
 
 ## The pass bar
 
-Scored across all **17** scorecards.
+Scored across all **13** scorecards.
 
-| Criteria | Across all 17 |
+| Criteria | Across all 13 |
 |---|---|
-| **Resolution quality** | **≥ 12 Good** (71%), remainder OK, NO hallucinations |
-| **Actionability** | **≥ 12 Good** (71%), remainder OK |
-| **Time saved** | **≥ 12 Good** (71%) |
+| **Resolution quality** | **≥ 9 Good** (~70%), remainder OK, NO hallucinations |
+| **Actionability** | **≥ 9 Good** (~70%), remainder OK |
+| **Time saved** | **≥ 9 Good** (~70%) |
 
 **For each type of failure, what is the min number of "Good" required?**
 
 | Failure type | Cases | Good required |
 |---|---|---|
-| Argo sync failure | 4 | **≥ 3** |
 | Argo synced, but workload down | 4 | **≥ 3** |
 | Kubernetes-native networking | 4 | **≥ 3** |
 | Istio — ingress gateway to Keycloak | 3 | **≥ 2** |
