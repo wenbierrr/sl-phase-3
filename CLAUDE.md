@@ -326,7 +326,7 @@ Against the epic's acceptance criteria:
 - **It runs on the author's laptop (CRC), not the airgapped stg** — hub and stg collapsed onto one cluster, which is what lets Argo scenarios back in. A CRC pass still cannot settle the placement half of 1.1.1.
 - **No non-SF DE attempts Istio unaided.** With 3 SF DEs, that fixes the whole allocation: 5/5/3 unaided across Argo/k8s/Istio, and **20 of the 26 AI scorecards come from non-SF DEs**.
 - **Two records, because ground truth and experience come from different people.** The facilitator records correctness against the sealed key, hallucination and timings; the DE fills one scorecard at the end covering all three scenarios.
-- **Rubric: Resolution quality · Time saved · Actionability · Learning · Willingness to use**, each graded **1–5** (No Go / Poor / OK / Good / Excellent). The two attitude items are asked 0–10 and banded to 1–5.
+- **Rubric: Resolution quality · Time saved · Actionability · Learning · Willingness to use**, each graded **1–5** (No Go / Poor / OK / Good / Excellent), every level carrying a written anchor on the scorecard itself.
 - **`Non-SF` is the agreed proxy for "less experienced"** — SF are the platform specialists. Winner point 3 is scored on that basis, and every figure is split SF against non-SF.
 - **The pass bar is deliberately not yet set** — to be agreed before the trial starts, and before any data exists.
 
@@ -370,7 +370,7 @@ Whichever is used, state the method and its limits alongside the result.
 
 **Exploration** — the RFC-1/RFC-2 work: trying tools, spiking, running stg cases. The criteria do not apply. Don't build RBAC, audit trails, or platform abstraction here. Hack freely against stg.
 
-**Promotion** — the boundary is concrete: **RFC-2's Day-0 thresholds**, agreed by the team *before* any pilot data exists, scored at the end of the pilot week. Passing means proceeding to RFC-X (production security, RBAC wiring, rollout) — not to production directly. Two notes: the drafted-change bar (winner point 1) is assessed **by the author personally, not by the DE trial**, and **DE-estimated time saved *is* among the thresholds since Aug 2026** — the supervisor's call, banded rather than precise.
+**Promotion** — the boundary is concrete: **RFC-2's Day-0 thresholds**, agreed by the team *before* any pilot data exists, scored at the end of the pilot week. Passing means proceeding to RFC-X (production security, RBAC wiring, rollout) — not to production directly. Two notes: the drafted-change bar (winner point 1) is assessed **by the author personally, not by the DE trial**, and **time saved *is* among the thresholds since Aug 2026** — the supervisor's call, now measured from the with-AI/without-AI runs rather than estimated by the DE.
 
 The gate is a real filter: a tool can be impressive in exploration and still fail on unbounded blast radius, no DE-identity mapping in the audit trail, or an uncarryable maintenance burden. Fixing the thresholds before the data exists is what stops them being quietly relaxed to fit a result. Don't let a spike drift toward production without passing the gate, and don't silently apply gate-level engineering to something still being explored. A failed gate that names its elimination factor is a valid answer to the epic's question, not a failed project.
 
