@@ -321,12 +321,12 @@ Against the epic's acceptance criteria:
 
 **The DE trial, agreed Aug 2026** — full detail in [DE-trial-execution.md](DE-trial-execution.md):
 
-- **13 DEs, 14 scenarios, 39 attempts** — 13 unaided and **26 with AI**, covering 1.1.1–1.1.3. Each DE runs 3 scenarios, one per family (Argo · k8s-native · Istio), in a 35-minute box.
-- **The first scenario is run unaided (15 min), the other two with AI (10 min each).** This is what finally gives the project a **prospective baseline**: the same scenario is run both ways by different DEs, so time saved is *computed*, not estimated. It supersedes the banded DE-estimate below.
+- **13 DEs, 14 scenarios, 39 attempts** — 13 without AI and **26 with AI**, covering 1.1.1–1.1.3. Each DE runs 3 scenarios, one per family (Argo · k8s-native · Istio), in a 35–40 minute box.
+- **The first scenario is run without AI (15 min), the other two with AI (10 min each).** This is what finally gives the project a **prospective baseline**: the same scenario is run both ways by different DEs, so time saved is *computed*, not estimated. It supersedes the banded DE-estimate below.
 - **It runs on the author's laptop (CRC), not the airgapped stg** — hub and stg collapsed onto one cluster, which is what lets Argo scenarios back in. A CRC pass still cannot settle the placement half of 1.1.1.
-- **No non-SF DE attempts Istio unaided.** With 3 SF DEs, that fixes the whole allocation: 5/5/3 unaided across Argo/k8s/Istio, and **20 of the 26 AI scorecards come from non-SF DEs**.
-- **Two records, because ground truth and experience come from different people.** The facilitator records correctness against the sealed key, hallucination and timings; the DE fills one scorecard at the end covering all three scenarios.
-- **Rubric: Resolution quality · Time saved · Actionability · Learning · Willingness to use**, each graded **1–5** (No Go / Poor / OK / Good / Excellent), every level carrying a written anchor on the scorecard itself.
+- **No non-SF DE attempts Istio without AI.** With 3 SF DEs, that fixes the whole allocation: 5/5/3 without AI across Argo/k8s/Istio, and **20 of the 26 AI scorecards come from non-SF DEs**.
+- **Two records, because ground truth and experience come from different people.** The facilitator records the timings, whether the root cause was reached, and whether the AI hallucinated; the DE fills one scorecard at the end covering all three scenarios.
+- **Rubric: Resolution quality · Time saved · Actionability · Learning · Willingness to use**, each graded **1–5** (No Go / Poor / OK / Good / Excellent). The scorecard anchors only the endpoints; all five levels are defined in the rubric table.
 - **`Non-SF` is the agreed proxy for "less experienced"** — SF are the platform specialists. Winner point 3 is scored on that basis, and every figure is split SF against non-SF.
 - **The pass bar is deliberately not yet set** — to be agreed before the trial starts, and before any data exists.
 
@@ -338,7 +338,7 @@ See [plan.md](plan.md) for the 8-week schedule. When the active work changes, up
 
 Workable substitutes, in order of strength:
 
-- **Capture the baseline prospectively.** During a pilot, run a real D-2-D failure both ways — DE unaided, and DE with the agent — and time both. Small n is fine; say what n was.
+- **Capture the baseline prospectively.** During a pilot, run a real D-2-D failure both ways — DE without AI, and DE with the agent — and time both. Small n is fine; say what n was.
 - **Count outcomes instead of minutes.** Did the agent identify the actual root cause? Could the DE have solved it without the agent at all? Countable without historical data, and maps directly onto what the supervisor cares about.
 - **Structured DE judgement.** DEs who ran the pilot say whether it helped and where. Weak evidence, honest when labelled as such.
 
@@ -346,7 +346,7 @@ Whichever is used, state the method and its limits alongside the result.
 
 **This bites concretely on RFC-2's pilot scorecard.** Two fields sit on opposite sides of the line:
 
-- *"Roughly how long without the tool?"* — was a **DE estimate**, and the failure mode was quiet: an estimate hardening into a measured figure between scorecard and decision memo. **Superseded (Aug 2026)** — the DE trial now runs each DE's first scenario unaided, so every scenario has a real unaided time from another DE and time saved is **computed, not asked**. The question is off the scorecard entirely. Don't reinstate it.
+- *"Roughly how long without the tool?"* — was a **DE estimate**, and the failure mode was quiet: an estimate hardening into a measured figure between scorecard and decision memo. **Superseded (Aug 2026)** — the DE trial now runs each DE's first scenario without AI, so almost every scenario has a real without-AI time from another DE and time saved is **computed, not asked** (I1 and I2 are the exceptions; they fall back to the Istio average). The question is off the scorecard entirely. Don't reinstate it.
 - *"Without AI, would you have been able to solve this?"* — needs no baseline, is countable, and maps straight onto the toil the epic set out to reduce. Lead with this one. **Do not add an escalation-avoided question alongside it (supervisor's call, Aug 2026):** not having to escalate is a *consequence* of being able to solve the problem, so asking both counts the same effect twice.
 
 **The stg runs are not evidence — the pilot is.** Conflating them is the easiest way to overstate the case.
@@ -359,9 +359,9 @@ Whichever is used, state the method and its limits alongside the result.
 - **Percentages need n.** Fix the sample size before agreeing any percentage bar; at n=3 a percentage is noise. RFC-2 proposes n ≥ 8, reported as counts alongside percentages.
 - **Injected faults are cleaner than real ones**, and the injector knows what the tool can see. RFC-2 states this and the other limits explicitly. Don't let the pilot get described as proof.
 
-**Each DE case is timeboxed — 15 minutes unaided, 10 minutes with AI**, announced up front so it reads as a rule of the exercise, not the DE giving up. Two consequences for the numbers:
+**Each DE case is timeboxed — 15 minutes without AI, 10 minutes with AI**, announced up front so it reads as a rule of the exercise, not the DE giving up. Two consequences for the numbers:
 
-- **Time-to-root-cause becomes censored data.** A case that hits its timebox did not take that long — it did not finish. Record it as **unresolved**, and never average it with completed times; averaging censored runs silently flatters the tool. Where an *unaided* run is censored, its scenario's baseline is treated as 15 minutes, which understates the saving rather than inflating it.
+- **Time-to-root-cause becomes censored data.** A case that hits its timebox did not take that long — it did not finish. Record it as **unresolved**, and never average it with completed times; averaging censored runs silently flatters the tool. Where a *without-AI* run is censored, the trial assumes a baseline of **30 minutes**, on the reasoning that the DE would have escalated and the case would have run on. **Treat that as an assumption, not a measurement** — the only observed fact is that it took longer than 15 minutes, so a 30-minute baseline inflates the computed saving rather than understating it. Label it as an assumption wherever the figure is quoted, and say what the saving looks like against the observed 15-minute floor as well.
 - **Unresolved is not the same as `no root cause found`.** The first says the tool was too slow to be worth reaching for; the second says it was wrong or empty. Only the second bears on resolution quality. The timebox also caps what a *wrong* root cause can cost — re-read that pass bar when it is agreed rather than carrying over a figure set against unbounded sessions.
 
 ## The evaluation criteria are a promotion gate
