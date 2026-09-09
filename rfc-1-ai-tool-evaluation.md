@@ -20,7 +20,7 @@
 
 When a deployment breaks in the cluster, finding the cause and the fix is time-consuming. The goal is to enable AI to assist DEs with troubleshooting these issues, so as to save time.
 
-**The question this RFC answers: which AI tool is the most promising to take forward?** It narrows the field to one architecture ([options](#options-considered) → [comparison matrix](#comparison-matrix)). Getting hands on with it and measuring its value with DEs follow in [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
+**The question this RFC answers: which AI tool is the most promising to take forward?** It narrows the field to one architecture ([options](#options-considered) → [comparison matrix](#comparison-matrix)). Getting hands on with it and measuring its value with DEs follow in the [DE trial](DE-trial-execution.md), and the decision it produced is recorded in the ADR.
 
 ## Scope
 
@@ -30,8 +30,8 @@ When a deployment breaks in the cluster, finding the cause and the fix is time-c
 **Out of scope:**
 - Hosting of the LLM (an inference endpoint is assumed to be provided)
 - Which LLM model to use
-- **Which MCP server to pair with LibreChat** — k8sgpt serves as the reference implementation for scoring here; the actual choice (k8sgpt MCP, a kubernetes MCP, both, or an added Argo MCP) is [RFC-2](rfc-2-mcp-server-eval-for-librechat.md)
-- Hands-on work with the promising tool(s) on stg (behaviour and configuration) and measuring it with DEs — also [RFC-2](rfc-2-mcp-server-eval-for-librechat.md)
+- **Which MCP server to pair with LibreChat** — k8sgpt serves as the reference implementation for scoring here; the actual choice is settled by the [DE trial](DE-trial-execution.md) and recorded in the ADR
+- Hands-on work with the promising tool(s) on stg (behaviour and configuration) and measuring it with DEs — the [DE trial](DE-trial-execution.md)
 - Detailed security considerations of the chosen tool (agent definitions, rollout plan, RBAC wiring) — that follows in a separate design RFC once a tool is picked.
 
 ## Brief overview of the different tools
@@ -148,7 +148,7 @@ Each decision driver, scored across all four options, split into **Information**
 
 **Reading the last column.** LibreChat is only a chat interface — on its own it cannot see the cluster at all, so scoring it meant pairing it with an MCP server. We used k8sgpt.
 
-Cells marked *(k8sgpt as reference.)* are the ones that would change if a different MCP server were used. The unmarked cells describe LibreChat itself and stay true whichever MCP server sits behind it. Which server it should actually be is [RFC-2](rfc-2-mcp-server-eval-for-librechat.md).
+Cells marked *(k8sgpt as reference.)* are the ones that would change if a different MCP server were used. The unmarked cells describe LibreChat itself and stay true whichever MCP server sits behind it. Which server it should actually be is settled by the [DE trial](DE-trial-execution.md) and recorded in the ADR.
 
 
 | Decision driver | | 1 · K8sGPT | 2 · kubectl-ai | 3 · kagent (assuming the Diagnostician & Collector architecture) | 4 · LibreChat + MCP server |
@@ -183,7 +183,7 @@ With all the options weighed, the matrix leaves one candidate standing:
 
 It settles the **orchestrator**: LibreChat, for its web GUI, persisted multi-user history, and the absence of any disqualifying gap.
 
-It does **not** settle the **MCP server**. That leaves one open question, and it belongs to [RFC-2](rfc-2-mcp-server-eval-for-librechat.md): **which combination of MCP servers to adopt, to best help DEs.**
+It does **not** settle the **MCP server**. That leaves one open question — **which MCP server to adopt, to best help DEs** — answered by the [DE trial](DE-trial-execution.md) and recorded in the ADR.
 
 
 # Appendix

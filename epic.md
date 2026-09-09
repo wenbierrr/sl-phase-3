@@ -49,6 +49,6 @@ Any candidate solution is assessed against both sides of the ledger. Benefit is 
 
 # Acceptance criteria
 
-- [ ] Trial of propose of solution by DE
+- [x] Trial of propose of solution by DE
 - [ ] RFC on choice of tools
 - [ ] `service-design` of solution if ADR go ahead

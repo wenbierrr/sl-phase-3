@@ -60,30 +60,62 @@ The 13 DEs fall into three groups, by which family of problem they take without 
 | Non-SF, group A | 5 | Argo | k8s | Istio |
 | Non-SF, group B | 5 | k8s | Argo | Istio |
 
-All 10 non-SF DEs get an AI-assisted Istio run. As a result, the comparison for istio problems is SF (without AI) vs Non-SF (with AI), which will prove a strong data point to justify the use of AI.  
+All 10 non-SF DEs get an AI-assisted Istio run. As a result, the comparison for Istio problems is **SF (without AI) vs Non-SF (with AI)** — the claim the whole benefit case rests on: *a less-experienced DE with the tool performs like an experienced one without it.*
+
+**That comparison is deliberately conservative.** The less-experienced DE has to overcome the experience gap before any saving appears, so a saving that survives is hard to argue with.
+
+**It also has a hard ceiling. 3 SF DEs × 1 without-AI run each = 3 SF baselines**, and all three must be Istio, because rule 3 means Istio gets no baseline any other way. So only three scenarios can ever carry the claim. The roster below concentrates the non-SF AI-assisted Istio runs onto exactly those three, which is what raises the count.
 
 
 ### The roster — who runs what
 
-Ordered by day, with the three SF DEs on Tue, Wed and Fri.
+Ordered by day, with the three SF DEs on Mon, Tue and Wed so each Istio baseline is set before most of the AI-assisted runs of the same scenario.
 
 | Day | DE | Team | **1 — without AI** (15 min) | **2 — with AI** (10 min) | **3 — with AI** (10 min) |
 |---|---|---|---|---|---|
-| **Mon** | 05 | Non-SF | **A2** | K7 | I1 |
-| | 07 | Non-SF | **A3** | K5 | I2 |
-| | 11 | Non-SF | **K3** | A2 | I4 |
-| **Tue** | 01 | SF | **I3** | A2 | K3 |
-| | 04 | Non-SF | **A1** | K1 | I1 |
-| | 12 | Non-SF | **K5** | A3 | I5 |
-| **Wed** | 02 | SF | **I4** | A2 | K5 |
-| | 09 | Non-SF | **K1** | A1 | I3 |
-| | 13 | Non-SF | **K6** | A4 | I5 |
-| **Thu** | 06 | Non-SF | **A2** | K3 | I2 |
-| | 08 | Non-SF | **A4** | K6 | I3 |
-| **Fri** | 03 | SF | **I5** | A4 | K6 |
-| | 10 | Non-SF | **K7** | A2 | I4 |
+| **Mon** | 01 (yong jiun) | SF | **I3** | A1 | K3 |
+| | 05 (jeremy) | Non-SF | **A2** | K6 | I4 |
+| | 13 (nicholas) | Non-SF | **K7** | A4 | I2 |
+| **Tue** | 02 (favian) | SF | **I4** | A3 | K5 |
+| | 04 (anthony) | Non-SF | **A1** | K1 | I3 |
+| | 12 (claudia) | Non-SF | **K6** | A2 | I1 |
+| **Wed** | 03 (zhi wen) | SF | **I5** | A4 | K6 |
+| | 07 (melvin) | Non-SF | **A3** | K3 | I4 |
+| | 09 (jia qing) | Non-SF | **K1** | A2 | I3 |
+| **Thu** | 06 (clement) | Non-SF | **A2** | K7 | I3 |
+| | 08 (jiong) | Non-SF | **A4** | k5 | I5 |
+| **Fri** | 10 (jeng) | Non-SF | **K3** | A2 | I4 |
+| | 11 (joash) | Non-SF | **K5** | A2 | I5 |
 
-**The week contains exactly one same-day overlap: DE-05 and DE-11 both meet A2 on Monday.**
+**The week contains exactly one same-day overlap: DE-10 and DE-11 both meet A2 on Friday.** That is the minimum available — six DEs carry A2 across five days, so by pigeonhole one day must hold two.
+
+#### What this roster buys
+
+**8 direct leveling-up comparisons**, up from 6. Each is a non-SF DE, with AI, on a scenario whose baseline is an SF DE without AI:
+
+| Scenario | SF baseline (no AI) | Non-SF runs with AI | Direct comparisons |
+|---|---|---|---|
+| **I3** | DE-01 | DE-04, DE-06, DE-09 | 3 |
+| **I4** | DE-02 | DE-05, DE-07, DE-10 | 3 |
+| **I5** | DE-03 | DE-08, DE-11 | 2 |
+| | | | **8** |
+
+
+
+#### Rules — adhered and not
+
+| | Rule | Status |
+|---|---|---|
+| **1** | Minimal overlaps | ✅ **Adhered, and provably minimal.** One same-day overlap (DE-10 / DE-11 on A2, Friday). Cannot be reduced without lowering A2's four AI-assisted runs |
+| **2** | Every DE does 3 runs — 1 without AI (15 min), 2 with AI (10 min) | ✅ **Adhered.** 13 × 1 = 13 without AI, 13 × 2 = 26 with AI, 39 total. Every DE also still takes one scenario per family, and no DE meets the same scenario twice |
+| **3** | No non-SF does Istio without AI | ✅ **Adhered.** All three Istio baselines are SF — DE-01 (I3), DE-02 (I4), DE-03 (I5). No non-SF appears in an Istio without-AI slot |
+
+**Two things this roster does *not* achieve, both structural rather than oversights:**
+
+1. **The 6 SF AI-assisted runs stay confounded.** Each SF DE owes two AI-assisted runs, and under rule 3 those must be Argo and k8s — families where every baseline is non-SF. So DE-01 (A1, K3), DE-02 (A3, K5) and DE-03 (A4, K6) are all *SF-with-AI measured against a non-SF baseline*, where experience and tool push the same way and inflate the saving. **Exclude these 6 from the time-saved computation** — see [How Time saved is worked out](#how-time-saved-is-worked-out). They still count for resolution quality, actionability, hallucination and every DE-scored field.
+2. **Leveling-up cannot reach Argo or k8s.** It needs an SF baseline, all three are spent on Istio, and moving one would leave an Istio scenario with no baseline at all. Argo and k8s can therefore only answer the within-level question — *does the tool make the same population faster?* **Do not present an Argo or k8s result as evidence that AI lifts a less-experienced DE to expert level.**
+
+**The cost of the change:** I1 and I2 drop from 2 AI-assisted runs to 1 each. They keep their anti-sharing role and still yield resolution-quality, actionability and hallucination data — they just contribute less to the timing figures, which they were never able to ground anyway.
 
 
 ### Argo — 4 scenarios
@@ -112,11 +144,13 @@ Ordered by day, with the three SF DEs on Tue, Wed and Fri.
 
 | ID | Presents as | Injected fault | number of ppl who will do it without AI / with AI |
 |---|---|---|---|
-| **I1** | Connection reset between two services | Sidecar not injected (namespace label missing) against `PeerAuthentication: STRICT` | 0 / 2 |
-| **I2** | RBAC: access denied | `AuthorizationPolicy` denies the caller | 0 / 2 |
-| **I3** | 503 from the mesh | `VirtualService` routes to a subset the `DestinationRule` never defines | 1 / 2 |
-| **I4** | Caller fails; **a correct-looking AuthorizationPolicy sits in the path as a decoy** | Three-namespace `exportTo` visibility fault; the symptom is two hops from the cause | 1 / 2 |
+| **I1** | Connection reset between two services | Sidecar not injected (namespace label missing) against `PeerAuthentication: STRICT` | 0 / 1 |
+| **I2** | RBAC: access denied | `AuthorizationPolicy` denies the caller | 0 / 1 |
+| **I3** | 503 from the mesh | `VirtualService` routes to a subset the `DestinationRule` never defines | 1 / 3 |
+| **I4** | Caller fails; **a correct-looking AuthorizationPolicy sits in the path as a decoy** | Three-namespace `exportTo` visibility fault; the symptom is two hops from the cause | 1 / 3 |
 | **I5** | Connection fails; **both configs are individually correct** | `PeerAuthentication: STRICT` on the server, `DestinationRule` sets `tls.mode: DISABLE` for the same host | 1 / 2 |
+
+**I3, I4 and I5 carry the leveling-up claim** — each has an SF baseline, and its AI-assisted runs are all non-SF. **I1 and I2 have no baseline of their own** and are scored on resolution quality, actionability and hallucination only.
 
 
 
@@ -128,12 +162,12 @@ Ordered by day, with the three SF DEs on Tue, Wed and Fri.
 |---|---|---|---|---|
 | It reaches the right answer | Root cause checked against answer | Facilitator | "X correct, Y wrong" | 26 AI cases |
 | **It does not hallucinate** | Anything it stated that was not true | Facilitator | "1 of 26 cases hallucinated" | 26 AI cases |
-| It makes DEs faster | Time to root cause, with AI VS without AI| Facilitator | Calculated in terms of % — see [How Time saved is worked out](#how-time-saved-is-worked-out) | 26 with AI vs 13 without |
+| It makes DEs faster | Time to root cause, with AI VS without AI| Facilitator | Calculated in terms of % — see [How Time saved is worked out](#how-time-saved-is-worked-out) | **20** with AI vs 13 without (6 SF AI runs excluded) |
 | It finds root causes the DE otherwise misses | Was the root cause found inside the timebox | Facilitator | "21 of 26 (81%) with AI, 6 of 13 (46%) without" | 26 with AI vs 13 without |
 | **It solves what the DE could not have solved alone** | "Without AI, I wouldn't have been able to solve this" | DE | "14 of 26 (54%) answered yes, 12 of them non-SF" | 26 AI cases |
 | Its answer is right without having to be guided there | Resolution quality, 1–5 | DE | "19 of 26 ans 5/5" | 26 AI cases |
 | Its output can be used as it stands | Actionability, 1–5 | DE | "19 of 26 ans 5/5" | 26 AI cases |
-| It levels DEs up — they left knowing more | Learning, 1–5 | DE | "5 of 13 ans 5/5" | 13 — one per DE |
+| DEs expect it to level them up — to learn JPE apps faster | Learning *(forecast)*, 1–5 | DE | "5 of 13 ans 5/5" | 13 — one per DE |
 | DEs would actually use it | Willingness to use next rotation, 1–5 | DE | "6 of 13 ans 5/5" | 13 — one per DE |
 
 
@@ -167,7 +201,7 @@ One form per DE, filled once at the end, ~2 minutes.
 
 | | |
 |---|---|
-| **Learning** (1–5)<br/>Did the AI tool help you **learn things you didn't know**? | **1** learned nothing I didn't already know - **5** learned something that changes how I troubleshoot |
+| **Learning** (1–5)<br/>With this tool, do you foresee it helping you **learn faster** with regards to apps within **JPE** (including troubleshooting if needed)? | **1** no, it definitely will not help me learn faster - **5** yes, it definitely will help me learn faster |
 | **Willingness to use** (1–5)<br/>How willing would you be to use this on your **next duty rotation**? | **1** would not use it - **5** would use it every subsequent DE day  |
 | **Any areas the AI fall short?** | *(free text)* |
 
@@ -180,9 +214,9 @@ Five criteria, each graded 1–5.
 | Criteria | 1: No Go | 2: Poor | 3: OK | 4: Good | 5: Excellent | n |
 |---|---|---|---|---|---|---|
 | **Resolution quality** | Wrong or made up — named a cause that was not the cause, or said something untrue about the cluster | Nothing untrue, but too vague to act on; the DE got there themselves | Right direction, but only after repeated prompting | Correct, after more than one prompt | Correct after a single prompt — the one stating what is wrong | 26 |
-| **Time saved** *(computed)* | No saving, or slower | >0–25% | >25–50% | >50–75% | >75%, or resolved a case that went unresolved without AI | 26 |
+| **Time saved** *(computed)* | No saving, or slower | >0–25% | >25–50% | >50–75% | >75%, or resolved a case that went unresolved without AI | 20 |
 | **Actionability** | Unusable, or following it would have made things worse | Pointed at the right area but gave no fix the DE could use | Gave a fix the DE had to substantially rewrite | Gave a fix needing minor edits | Gave a fix the DE applied exactly as written | 26 |
-| **Learning** | Learned nothing I didn't already know | Picked up a minor detail | Learned something useful about this cluster | Learned something I will use on future cases | Learned something that changes how I would troubleshoot | 13 |
+| **Learning** *(forecast)* | No — it definitely will not help me learn JPE apps any faster | Unlikely — marginal at best; I would still learn them the same way | Possibly — faster on some parts of JPE, not on others | Likely — it would speed up how quickly I get to grips with JPE apps | Yes — it definitely will help me learn JPE apps, and troubleshoot them, faster | 13 |
 | **Willingness to use** | Would not use it | Would use it reluctantly | Would use it occasionally | Would use it on most rotations | Would use it every rotation | 13 |
 
 
@@ -196,10 +230,13 @@ Five criteria, each graded 1–5.
 | DE-02 | with AI | 5 min | (12−5) ÷ 12 = **58%** | 4 |
 | DE-07 | with AI | 7 min | (12−7) ÷ 12 = **42%** | 3 |
 
-Two cases to note:
+Three cases to note:
 
-- **I1 and I2 are never run without AI**, since there will only be 3 SF personel. For these two scenarios, we use the average without-AI time across the Istio scenarios as the baseline.
-- **If the DE without AI ran out of time**, it means time to resolution will be >15 min, and we will assume a time of 30 mins considering how the DE will need to escalate.
+- **I1 and I2 are never run without AI**, since there will only be 3 SF personel. Their single AI-assisted run each is **not given a time-saved grade** — the old fallback of averaging the other Istio scenarios borrowed a baseline from a different fault, which is not a measurement. Score them on resolution quality, actionability and hallucination only.
+- **The 6 SF AI-assisted runs are excluded** — DE-01 (A1, K3), DE-02 (A3, K5), DE-03 (A4, K6). Each is an SF DE with AI measured against a non-SF baseline, so experience and tool push the same way and the saving is overstated. **Time saved is therefore reported on n = 20, not 26.** State the n alongside the figure.
+- **If the DE without AI ran out of time**, it means time to resolution will be >15 min, and we will assume a time of 30 mins considering how the DE will need to escalate. **That 30 is an assumption, not a measurement** — the only observed fact is "longer than 15 minutes", and 30 inflates the computed saving. Label it as an assumption wherever quoted, and report the saving against the observed 15-minute floor as well.
+
+**The 8 comparisons that carry the benefit case** are the non-SF AI-assisted runs on I3, I4 and I5, each measured against that scenario's SF baseline. Report these separately from the within-level Argo and k8s figures — they answer a different question, and it is the one the supervisor cares about.
 
 ## The pass bar
 
