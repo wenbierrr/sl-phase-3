@@ -91,11 +91,11 @@ RFC-1 settled the **orchestrator**: LibreChat. Behind it sits the **MCP server**
 
 **Starforge** is the org's platform team; DEs escalate to them for platform-level changes.
 
-**One LibreChat for every cluster (supervisor, Sep 2026) — user experience takes priority.** DEs open one URL and pick the cluster in LibreChat's MCP picker, with one Kubernetes MCP server registered per cluster: `kubernetes-mcp-hub`, `-stg`, `-prd`, `-prd2`.
+**One LibreChat on hub, all four MCP servers beside it — NOT CONFIRMED, needs an RFC then an ADR.** DEs open one URL and pick the cluster in LibreChat's MCP picker: `kubernetes-mcp-hub`, `-stg`, `-prd`, `-prd2`. **The alternative:** a LibreChat + MCP server pair installed on every cluster.
 
-**The picker is the cluster selector — the model never infers which cluster it is on.** Tools are namespaced `<tool>_mcp_<serverName>`, and **only ticked servers' tools *and* `serverInstructions` reach the model** ([`agents/load.ts`](LibreChat/packages/api/src/agents/load.ts), [`agents/context.ts`](LibreChat/packages/api/src/agents/context.ts)), so an unticked cluster is invisible. Concerns include:
+**The picker is the cluster selector — the model never infers which cluster it is on.** Tools are namespaced `<tool>_mcp_<serverName>`, and **only ticked servers' tools *and* `serverInstructions` reach the model** ([`agents/load.ts`](LibreChat/packages/api/src/agents/load.ts), [`agents/context.ts`](LibreChat/packages/api/src/agents/context.ts)), so an unticked cluster is invisible.
 
-- **Reaching the spokes is the open problem.** LibreChat runs on **hub**, so hub's own MCP server stays a ClusterIP call and already works; stg, prd and prd2 each need theirs reachable from hub, which means exposing it past ClusterIP and adding an `mcpSettings.allowedAddresses` entry per cluster.
+**If the ADR decides on all four MCP servers on hub:** hub's own server is a ClusterIP call and already works; `-stg`, `-prd` and `-prd2` each reach their cluster by kubeconfig, so hub holds one spoke credential each — scoped to `kubernetes-mcp-server-read-no-secrets` there.
 
 Spokes join via **RHACM, not `argocd cluster add`**, and hub self-deployment is off. Two consequences:
 
@@ -132,12 +132,12 @@ CRC (local OpenShift) on the author's laptop: 16 vCPU / 64 GB. GitLab, Argo CD a
 | Root cause reached | **96% with AI (25/26)** vs 69% without (9/13) |
 | Hallucinations | **1 of 26** — caused by no repository visibility; the model invented chart scaffolding it could not read |
 | Willingness to use next rotation | **13 of 13 scored 5/5** |
-| Non-SF DEs who could not have solved it alone | **14 of 18 (78%)**; 0 of 6 for SF |
+| Non-SF DEs who could not have solved it alone | **16 of 20 (80%)**; 0 of 6 for SF |
 | Time saved | **7 of 14 comparable runs saved time**, 4 no change, 3 slower |
 
 **The time figures need their caveat every time they are quoted.** Savings appear only where the without-AI baseline exceeded ~6 minutes: scenarios with 10+ minute baselines saved 27–68%, scenarios under 4 minutes saved nothing. That is a **floor effect** — when a DE solves something unaided in two minutes there is no time for a tool to save. **Never report a single blended mean**; it averages a real effect with a measurement floor and understates both.
 
-**No pass bar was ever agreed** — `DE-trial-execution.md` still reads "To be agreed". Report the figures; do not set a bar now against data that already exists, and do not reverse-engineer one the data happens to clear.
+**No pass bar was ever agreed** — the design never set one. Report the figures; do not set a bar now against data that already exists, and do not reverse-engineer one the data happens to clear.
 
 
 ## Deliverables
@@ -147,8 +147,8 @@ Two documents, per the supervisor (Sep 2026). Follow `templates/` and `team-guid
 | | Question | State |
 |---|---|---|
 | [rfc-1-ai-tool-evaluation.md](rfc-1-ai-tool-evaluation.md) | Which tool architecture? K8sGPT vs kubectl-ai vs kagent vs LibreChat + an MCP server | **Done.** Verdict: LibreChat + MCP server |
-| **ADR** | Record the decision to adopt **LibreChat + Kubernetes MCP server**, evidenced by the DE trial | **Next** |
-| `service-design` | Production security, RBAC wiring, rollout | Only if the ADR goes ahead |
+| **ADR** | Record the decision to adopt **LibreChat + Kubernetes MCP server**, evidenced by the DE trial | **Done.** |
+| `service-design` | Production security, RBAC wiring, rollout | **Next** |
 
 **The ADR carries three things:** the decision and the trial evidence behind it (willingness 13/13, 96% resolution, the non-SF split); why Kubernetes MCP over k8sgpt — it reaches strictly more, since k8sgpt has no Istio analyzers and needs 45 lines of tuning for the cases it can see; and, as an accepted trade-off, that **GitLab MCP was never tested**, which is also the named cause of the trial's single hallucination.
 
