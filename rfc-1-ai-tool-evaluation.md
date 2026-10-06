@@ -165,4 +165,3 @@ K8sGPT and kubectl-ai are both command-line tools: no access control, no history
 | **What gets deployed** | Two Helm releases per cluster: LibreChat, and the chosen MCP server |
 | **Rollback** | `helm uninstall` both releases. The tool cannot write to cluster, so there is no state to unwind |
 | **Effort** | Trial on 13 DEs. For each DE, they are given 3 commonly faced problems, with minimal overlaps. |
-| **Baseline compliance** | **RBAC** — the MCP server binds a read-only ServiceAccount with Secrets excluded from its read access; LibreChat needs no cluster role |

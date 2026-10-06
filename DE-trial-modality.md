@@ -1,6 +1,6 @@
-# DE trial execution
+# DE trial modality
 
-**Does the AI tool measurably help a duty engineer?** 13 DEs × 3 scenarios = 39 runs. Each DE solves one problem without AI before meeting two with the tool, so every comparison is measured, not estimated.
+**Question to answer: Does the AI tool measurably help a duty engineer?**
 
 ## Table of contents
 
@@ -116,19 +116,19 @@ The 13 DEs fall into three groups, by which family they take without AI:
 
 | Day | DE | Team | **1 — without AI** (15 min) | **2 — with AI** (10 min) | **3 — with AI** (10 min) |
 |---|---|---|---|---|---|
-| **Mon** | 01 (yong jiun) | SF | **I3** | A1 | K3 |
-| | 05 (jeremy) | Non-SF | **A2** | K6 | I4 |
-| | 13 (nicholas) | Non-SF | **K7** | A4 | I2 |
-| **Tue** | 02 (favian) | SF | **I4** | A3 | K5 |
-| | 04 (anthony) | Non-SF | **A1** | K1 | I3 |
-| | 12 (claudia) | Non-SF | **K6** | A2 | I1 |
-| **Wed** | 03 (zhi wen) | SF | **I5** | A4 | K6 |
-| | 07 (melvin) | Non-SF | **A3** | K3 | I4 |
-| | 09 (jia qing) | Non-SF | **K1** | A2 | I3 |
-| **Thu** | 06 (clement) | Non-SF | **A2** | K7 | I3 |
-| | 08 (jiong) | Non-SF | **A4** | k5 | I5 |
-| **Fri** | 10 (jeng) | Non-SF | **K3** | A2 | I4 |
-| | 11 (joash) | Non-SF | **K5** | A2 | I5 |
+| **Mon** | 01 | SF | **I3** | A1 | K3 |
+| | 05 | Non-SF | **A2** | K6 | I4 |
+| | 13  | Non-SF | **K7** | A4 | I2 |
+| **Tue** | 02  | SF | **I4** | A3 | K5 |
+| | 04  | Non-SF | **A1** | K1 | I3 |
+| | 12  | Non-SF | **K6** | A2 | I1 |
+| **Wed** | 03  | SF | **I5** | A4 | K6 |
+| | 07 | Non-SF | **A3** | K3 | I4 |
+| | 09 | Non-SF | **K1** | A2 | I3 |
+| **Thu** | 06 | Non-SF | **A2** | K7 | I3 |
+| | 08 | Non-SF | **A4** | k5 | I5 |
+| **Fri** | 10 | Non-SF | **K3** | A2 | I4 |
+| | 11 | Non-SF | **K5** | A2 | I5 |
 
 
 ### The 8 levelling-up comparisons
