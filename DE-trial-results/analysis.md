@@ -96,7 +96,7 @@ On Istio, non-SF DEs with AI were compared with an SF engineer without it:
 
 5 of 8 runs matched or beat SF, 2 were within 2 minutes, and 1 was the false-premise run. I4 is an `exportTo` visibility fault spanning three namespaces, two hops from its symptom, with a correct-looking AuthorizationPolicy in the path as a decoy.
 
-**Learning forecast** (will it help you learn JPE apps faster?): 9 × 5, 2 × 4, 2 × 3; mean 4.54.
+**Learning forecast** (will it help you learn JPE apps faster?): 9 × 5, 2 × 4, 2 × 3; mean 4.54. Every score below 5 was the same concern: DEs may skip building their own troubleshooting instinct.
 
 ## C · Time saved
 
